@@ -1,7 +1,7 @@
 # generalized random forests <a href='https://grf-labs.github.io/grf/'><img src='https://raw.githubusercontent.com/grf-labs/grf/master/images/logo/grf_logo_wbg_cropped.png' align="right" height="120" /></a>
 
 Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
-## What's Different:
+## Highlights:
 * Original package use symbolic links for all C++ codes, but Windows users may fail to build it from source. All C++ code locations are  re-arranged. 
 * Add target weight penalty in `regression_forest`
 * penalty is calculated as following:
