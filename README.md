@@ -7,9 +7,11 @@ Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 * penalty is calculated as following:
    1. calculate average from all target weight, denoted as $V_{0}$;
    2. in the left node, denote number of samples as $N$,  denote average target weight from samples  as $V_{1}$; 
-   3. add distribution penalty  as  $N*\frac{L_{2}Norm(V_{1}-V_{2})}{L_{2}Norm(V1) + L_{2}Norm(V2)}$. 
+   3. add distribution penalty rate as $D * N*\frac{L_{2}Norm(V_{1}-V_{2})}{L_{2}Norm(V1) + L_{2}Norm(V2)}$.  
       - early splits usually have larger $N$ 
+      - D is decrease in impurity
 * Package version is changed to 1.2.1
+
 
 ## Potential Problems:
 * Curse of dimensionality?
