@@ -232,9 +232,9 @@ create_train_matrices <- function(X,
     out[['target.weights.index']] <- (offset + 1):(offset + NCOL(target.weights))
     offset <- offset + NCOL(target.weights)
     out[["use.target.index"]] <- TRUE
-  }else{
-    out[["use.target.index"]] <- FALSE
-  }
+  } #else{
+  #   out[["use.target.index"]] <- FALSE
+  # }
 
 
   if (inherits(X, "dgCMatrix") && ncol(X) > 1) {

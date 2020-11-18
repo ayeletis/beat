@@ -142,6 +142,7 @@ causal_forest <- function(X, Y, W,
                           W.hat = NULL,
                           num.trees = 2000,
                           sample.weights = NULL,
+                          target.weights = NULL,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -166,6 +167,12 @@ causal_forest <- function(X, Y, W,
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   W <- validate_observations(W, X)
+
+  if(is.null(target.weights) | isFALSE(target.weights)){
+    target.weights = as.matrix(replicate(NROW(X), 1))
+  }
+  target.avg.weights = colMeans(target.weights, na.rm=TRUE)
+
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
@@ -176,6 +183,7 @@ causal_forest <- function(X, Y, W,
   args.orthog <- list(X = X,
                      num.trees = max(50, num.trees / 4),
                      sample.weights = sample.weights,
+                     target.weights = target.weights,
                      clusters = clusters,
                      equalize.cluster.weights = equalize.cluster.weights,
                      sample.fraction = sample.fraction,
@@ -189,7 +197,9 @@ causal_forest <- function(X, Y, W,
                      ci.group.size = 1,
                      tune.parameters = tune.parameters,
                      num.threads = num.threads,
-                     seed = seed)
+                     seed = seed #,
+                     #target.avg.weights=target.avg.weights
+                     )
 
   if (is.null(Y.hat) && !orthog.boosting) {
     forest.Y <- do.call(regression_forest, c(Y = list(Y), args.orthog))
@@ -218,8 +228,10 @@ causal_forest <- function(X, Y, W,
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
   data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
-                              sample.weights = sample.weights)
+                              sample.weights = sample.weights,
+                              target.weights=target.weights)
   args <- list(num.trees = num.trees,
+               target.avg.weights=target.avg.weights,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
                sample.fraction = sample.fraction,
@@ -258,7 +270,9 @@ causal_forest <- function(X, Y, W,
                                         tune.num.reps = tune.num.reps,
                                         tune.num.draws = tune.num.draws,
                                         num.threads = num.threads,
-                                        seed = seed)
+                                        seed = seed,
+                                        target.weights = target.weights,
+                                        target.avg.weights = target.avg.weights)
     args <- modifyList(args, as.list(tuning.output[["params"]]))
   }
 
@@ -366,6 +380,7 @@ predict.causal_forest <- function(object, newdata = NULL,
   X <- object[["X.orig"]]
   Y.centered <- object[["Y.orig"]] - object[["Y.hat"]]
   W.centered <- object[["W.orig"]] - object[["W.hat"]]
+  target.weights <-
   train.data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
 
   if (local.linear) {

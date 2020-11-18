@@ -107,7 +107,9 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               tune.num.reps = 50,
                               tune.num.draws = 1000,
                               num.threads = NULL,
-                              seed = runif(1, 0, .Machine$integer.max)) {
+                              seed = runif(1, 0, .Machine$integer.max),
+                              target.weights= NULL,
+                              target.avg.weights=NULL) {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
@@ -130,7 +132,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
   data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
-                              sample.weights = sample.weights)
+                              sample.weights = sample.weights, target.weights=target.weights)
   nrow.X <- nrow(X)
   ncol.X <- ncol(X)
   args <- list(clusters = clusters,
@@ -147,7 +149,8 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                ci.group.size = ci.group.size,
                num.threads = num.threads,
                seed = seed,
-               reduced.form.weight = 0)
+               reduced.form.weight = 0,
+               target.avg.weights=target.avg.weights)
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params

@@ -112,7 +112,8 @@ boosted_regression_forest <- function(X, Y,
                                       boost.max.steps = 5,
                                       boost.trees.tune = 10,
                                       num.threads = NULL,
-                                      seed = runif(1, 0, .Machine$integer.max)) {
+                                      seed = runif(1, 0, .Machine$integer.max),
+                                      target.weights=NULL) {
   boost.error.reduction <- validate_boost_error_reduction(boost.error.reduction)
   boosted.forest <- NULL
   boosted.forest[["forests"]] <- list()
@@ -130,8 +131,8 @@ boosted_regression_forest <- function(X, Y,
     seed = seed, ci.group.size = ci.group.size,
     alpha = alpha,
     imbalance.penalty = imbalance.penalty,
-    clusters = clusters, equalize.cluster.weights = equalize.cluster.weights
-  )
+    clusters = clusters, equalize.cluster.weights = equalize.cluster.weights,
+    target.weights=target.weights  )
   current.pred <- predict(forest.Y, num.threads = num.threads)
   # save tuned parameters for use on future boosting iterations
   tunable.params <- forest.Y$tunable.params
@@ -166,7 +167,9 @@ boosted_regression_forest <- function(X, Y,
         seed = seed, ci.group.size = ci.group.size,
         alpha = as.numeric(tunable.params["alpha"]),
         imbalance.penalty = as.numeric(tunable.params["imbalance.penalty"]),
-        clusters = clusters, equalize.cluster.weights = equalize.cluster.weights
+        clusters = clusters, equalize.cluster.weights = equalize.cluster.weights,
+        target.weights=target.weights
+
       )
       step.error.approx <- predict(forest.small, num.threads = num.threads)$debiased.error
       if (!(mean(step.error.approx, na.rm = TRUE) <= boost.error.reduction * mean(error.debiased, na.rm = TRUE))) {
@@ -187,7 +190,8 @@ boosted_regression_forest <- function(X, Y,
       seed = seed, ci.group.size = ci.group.size,
       alpha = as.numeric(tunable.params["alpha"]),
       imbalance.penalty = as.numeric(tunable.params["imbalance.penalty"]),
-      clusters = clusters, equalize.cluster.weights = equalize.cluster.weights
+      clusters = clusters, equalize.cluster.weights = equalize.cluster.weights,
+      target.weights=target.weights
     )
 
     current.pred <- predict(forest.resid, num.threads = num.threads)
