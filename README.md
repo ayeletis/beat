@@ -3,14 +3,19 @@
 Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 ## Highlights:
 * Original package use symbolic links for all C++ codes, but Windows users may fail to build it from source. All C++ code locations are  re-arranged. 
-* Add target weight penalty in `regression_forest`
+* Add  target weight penalty in `regression_forest` and `causual forest`
 * penalty is calculated as following:
-   1. calculate average sampled target weight;
-   2. in the left node, calculate average target weight; 
-   3. take l1 norm of the difference between the two vectors; 
-* Main change: `src\src\splitting\RegressionSplittingRule.cpp`
-* Package version is 1.2.1
+   1. calculate average from all target weight, denoted as $V_{0}$;
+   2. in the left node, denote number of samples as $N$,  denote average target weight from samples  as $V_{1}$; 
+   3. add distribution penalty  as  $N*\frac{L_{2}Norm(V_{1}-V_{2})}{L_{2}Norm(V1) + L_{2}Norm(V2)}$. 
+      - early splits usually have larger $N$ 
+* Package version is changed to 1.2.1
 
+## Potential Problems:
+* Curse of dimensionality?
+  - Euclidean distance is bad when the dimension of target weight is large.
+  - But increasing dimensions of target weight to 50 seems have no impact.
+* Need to figure out when causal forest use instrument or regression splitting rules.
 ## Build From Source:
 ```
 git clone https://github.com/yu45020/grf
@@ -21,69 +26,19 @@ Click Build --> Install and Restart
 
 --
 
-Sample usage:
-```{R}
-rm(list=ls())
-library(grf)
-library(data.table)
-library(ggpubr)
-r_2 = function(y_true, y_hat){
-  mean_y_true = mean(y_true)
-  top = (y_hat - mean_y_true)^2
-  bottom = (y_true - mean_y_true)^2
-  return(sum(top)/sum(bottom))
-}
-set.seed(1)
-n <- 5000
-p <- 10
-X <- matrix(rnorm(n * p), n, p)
-Z = matrix(c(sample(x=c(0,1), size=n, replace=TRUE, prob=c(0.3, 0.7)),
-             sample(x=c(0,1), size=n, replace=TRUE)),
-           n, 2)
-# Z = matrix(c(sample(x=seq(-100,100), size=n, replace=TRUE ),
-#              sample(x=seq(-1000,1000), size=n, replace=TRUE )),
-#            n, 2)
-Y <- X[, 1] * rnorm(n) +  Z[, 1] * rnorm(n)  +  Z[, 2] * rnorm(n)
+[Sample usage](r-package/grf/tests/causual_forest_test.R)
+
+### Results:
+<img src="images/density_difference.png" width="800">
+<img src="images/result_with_z_correlation.png" width="800">
+
+If Z is independent from X 
+<img src="images/result_with_z_no_correlation.png" width="800">
+
+If Z has 50 dimensions and plot the first dimension
+<img src="images/result_with_z_50_correlation.png" width="800">
 
 
-r.forest <- regression_forest(X, Y, num.trees = 200, target.weights=Z) #
-
-y_hat = predict(r.forest)
-
-out = data.table(y_true = Y, y_hat = y_hat$predictions, Z=Z)
-out[, idx := 1:.N]
-out = melt(out, measure.vars = c("y_true", 'y_hat'))
-out[, Z.V1:= as.character(Z.V1)]
-out[, Z.V2:= as.character(Z.V2)]
-
-p1 = ggpubr::ggdensity(data=out, x='value', color='Z.V1',facet.by = 'variable',
-                       title='With Weights',
-                       subtitle = sprintf("R2: %.4f", r_2(Y,y_hat$predictions)))
-
-p2 = ggpubr::ggdensity(data=out, x='value', color='Z.V2',facet.by = 'variable'  )
-p3 = ggpubr::ggdensity(data=out, x='value', color='variable'  )
-ggarrange(p1,p2,p3)
-ggsave("test_weights.png", width = 14, height=10)
-
-
-
-r.forest <- regression_forest(X, Y, num.trees = 1000, target.weights=NULL) #
-
-y_hat = predict(r.forest)
-out = data.table(y_true = Y, y_hat = y_hat$predictions, Z=Z)
-out[, idx := 1:.N]
-out = melt(out, measure.vars = c("y_true", 'y_hat'))
-out[, Z.V1:= as.character(Z.V1)]
-out[, Z.V2:= as.character(Z.V2)]
-
-p1 = ggpubr::ggdensity(data=out, x='value', color='Z.V1',facet.by = 'variable',
-                       title='Without Weights',
-                       subtitle = sprintf("R2: %.4f", r_2(Y,y_hat$predictions)))
-p2 = ggpubr::ggdensity(data=out, x='value', color='Z.V2',facet.by = 'variable'  )
-p3 = ggpubr::ggdensity(data=out, x='value', color='variable'  )
-ggarrange(p1,p2,p3 )
-ggsave("test_no_weights.png", width = 14, height=10)
-```
 Original ReadME
 -----
 

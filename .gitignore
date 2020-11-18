@@ -5,3 +5,4 @@ test/*
 *.history
 *.gz
 releases/*
+*.idea

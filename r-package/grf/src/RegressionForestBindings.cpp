@@ -33,7 +33,8 @@ Rcpp::List regression_train(Rcpp::NumericMatrix train_matrix,
                             Eigen::SparseMatrix<double> sparse_train_matrix,
                             size_t outcome_index,
                             size_t sample_weight_index,
-                            const std::vector<size_t>& target_weights_index,
+                            std::vector<size_t> target_weights_index,
+                            std::vector<double> target_avg_weights, 
                             bool use_sample_weights,
                             bool use_target_index,
                             unsigned int mtry,
@@ -58,10 +59,8 @@ Rcpp::List regression_train(Rcpp::NumericMatrix train_matrix,
   if(use_sample_weights) {
       data->set_weight_index(sample_weight_index);
   }
-  if(use_target_index) {
-    // std::cout <<'Use target index';
-    data->set_target_index(target_weights_index);
-  }
+  data->set_target_index(target_weights_index);
+  data->set_target_avg_weight(target_avg_weights);
 
   ForestOptions options(num_trees, ci_group_size, sample_fraction, mtry, min_node_size, honesty,
       honesty_fraction, honesty_prune_leaves, alpha, imbalance_penalty, num_threads, seed, clusters, samples_per_cluster);

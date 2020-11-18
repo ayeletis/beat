@@ -62,7 +62,7 @@ namespace grf
                                                   std::vector<double> &split_values,
                                                   std::vector<bool> &send_missing_left)
     {
-
+        // std::cout << "Regression split \n"; 
         size_t size_node = samples[node].size();
         size_t min_child_size = std::max<size_t>(std::ceil(size_node * alpha), 1uL);
 
@@ -144,7 +144,8 @@ namespace grf
             target_weights_matrix.row(i) = data.get_target_weight(sorted_samples[i]);
         }
 
-        Eigen::VectorXf  target_weight = target_weights_matrix.colwise().mean(); // mean per target column
+        Eigen::VectorXf target_avg_weight = data.get_target_avg_weights(1); // mean per target column
+        // std::cout << "regression target_avg_weight: " << target_avg_weight[0] << "\n" << std::flush;
         // std::cout << "target_weights_matrix top 3" << std::endl << target_weights_matrix.topRows(2) << std::endl;
         // std::cout << "target_weight \n" << target_weight << std::endl; 
         // target left node
@@ -171,9 +172,11 @@ namespace grf
                 weight_sums[split_index] += sample_weight;
                 sums[split_index] += sample_weight * response;
                 ++counter[split_index];
-                Eigen::VectorXf sample_target_left =  target_weights_matrix.topRows(i+1).colwise().mean();
-                target_left_weights[split_index] = (target_weight - sample_target_left).lpNorm<1>();
-
+                Eigen::VectorXf sample_target_left =  target_weights_matrix.topRows(i).colwise().mean();
+                target_left_weights[split_index] = size_node* (target_avg_weight - sample_target_left).lpNorm<2>()/ (target_avg_weight.lpNorm<2>() + sample_target_left.lpNorm<2>());
+                // std::cout <<'target_avg_weight'<< target_avg_weight << std::flush; 
+                // std::cout <<'sample_target_left'<< sample_target_left << std::flush; 
+                // std::cout << "target_left_weights:" <<  target_left_weights[split_index] << std::flush;
             }
 
             double next_sample_value = data.get(next_sample, var);
@@ -218,6 +221,7 @@ namespace grf
                 n_left += counter[i];
                 weight_sum_left += weight_sums[i];
                 sum_left += sums[i];
+                double panelty_target_weight =  target_left_weights[i] ;
 
                 // Skip this split if one child is too small.
                 if (n_left < min_child_size)
@@ -242,10 +246,11 @@ namespace grf
                 // target weight penalty
                 // std::cout << "left matrix:" << sample_target_weights_left_matrix.row(i) << "\n";
 
-                double panelty_target_weight =  target_left_weights[i] ;
+                //  std::cout <<"Decrease:" << decrease << " Regression target weight:"<< panelty_target_weight<< std::flush << "\n";
                 // std::cout << "target weight panelty:" << panelty_target_weight << "\n"  ;
-                decrease -= panelty_target_weight;
+                decrease  -= decrease * panelty_target_weight + 1e-4;
                 // If better than before, use this
+               
 
                 if (decrease > best_decrease)
                 {

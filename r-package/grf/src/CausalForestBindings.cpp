@@ -19,7 +19,7 @@
 #include <Rcpp.h>
 #include <sstream>
 #include <vector>
-
+#include <iostream>
 #include "commons/globals.h"
 #include "Eigen/Sparse"
 #include "forest/ForestPredictors.h"
@@ -34,7 +34,10 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
                         size_t outcome_index,
                         size_t treatment_index,
                         size_t sample_weight_index,
+                        std::vector<size_t> target_weights_index,
+                        std::vector<double> target_avg_weights,
                         bool use_sample_weights,
+                        bool use_target_index,
                         unsigned int mtry,
                         unsigned int num_trees,
                         unsigned int min_node_size,
@@ -61,6 +64,9 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
   if(use_sample_weights) {
       data->set_weight_index(sample_weight_index);
   }
+
+  data->set_target_index(target_weights_index);
+  data->set_target_avg_weight(target_avg_weights);
 
   ForestOptions options(num_trees, ci_group_size, sample_fraction, mtry, min_node_size, honesty,
                         honesty_fraction, honesty_prune_leaves, alpha, imbalance_penalty, num_threads, seed, clusters, samples_per_cluster);

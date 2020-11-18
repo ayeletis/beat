@@ -35,6 +35,8 @@ InstrumentalSplittingRule::InstrumentalSplittingRule(size_t max_num_unique_value
   this->num_small_z = new size_t[max_num_unique_values];
   this->sums_z = new double[max_num_unique_values];
   this->sums_z_squared = new double[max_num_unique_values];
+  this->target_left_weights = new double[max_num_unique_values];
+
 }
 
 InstrumentalSplittingRule::~InstrumentalSplittingRule() {
@@ -56,6 +58,10 @@ InstrumentalSplittingRule::~InstrumentalSplittingRule() {
   if (num_small_z != nullptr) {
     delete[] num_small_z;
   }
+  if (target_left_weights != nullptr)
+  {
+    delete[] target_left_weights;
+  }
 }
 
 bool InstrumentalSplittingRule::find_best_split(const Data& data,
@@ -67,6 +73,7 @@ bool InstrumentalSplittingRule::find_best_split(const Data& data,
                                                 std::vector<double>& split_values,
                                                 std::vector<bool>& send_missing_left) {
   size_t num_samples = samples[node].size();
+  // std::cout << "Instrument split \n"; 
 
   // Precompute relevant quantities for this node.
   double weight_sum_node = 0.0;
@@ -152,12 +159,26 @@ void InstrumentalSplittingRule::find_best_split_value(const Data& data,
   std::fill(num_small_z, num_small_z + num_splits, 0);
   std::fill(sums_z, sums_z + num_splits, 0);
   std::fill(sums_z_squared, sums_z_squared + num_splits, 0);
+  std::fill(target_left_weights, target_left_weights + num_splits, 0);
+
   size_t n_missing = 0;
   double weight_sum_missing = 0;
   double sum_missing = 0;
   double sum_z_missing = 0;
   double sum_z_squared_missing = 0;
   size_t num_small_z_missing = 0;
+
+  // target weights
+  Eigen::MatrixXf target_weights_matrix(num_samples, data.get_target_weight(1).size());
+
+  for (size_t i = 0; i < num_samples; i++)
+  {
+    target_weights_matrix.row(i) = data.get_target_weight(sorted_samples[i]);
+  }
+
+  Eigen::VectorXf target_avg_weight = data.get_target_avg_weights(1); // mean per target column
+  // std::cout << "Target avg weight:"<<  target_avg_weight << "\n";
+  // std::cout << "Instrument target_avg_weight: " << target_avg_weight[0] << "\n" << std::flush;
 
   size_t split_index = 0;
   for (size_t i = 0; i < num_samples - 1; i++) {
@@ -181,6 +202,10 @@ void InstrumentalSplittingRule::find_best_split_value(const Data& data,
       weight_sums[split_index] += sample_weight;
       sums[split_index] += sample_weight * responses_by_sample(sample);
       ++counter[split_index];
+
+      Eigen::VectorXf sample_target_left = target_weights_matrix.topRows(i).colwise().mean();
+      // target_left_weights[split_index] = (target_avg_weight - sample_target_left).lpNorm<1>();
+      target_left_weights[split_index] = num_samples* (target_avg_weight - sample_target_left).lpNorm<2>()/ (target_avg_weight.lpNorm<2>() + sample_target_left.lpNorm<2>());
 
       sums_z[split_index] += sample_weight * z;
       sums_z_squared[split_index] += sample_weight * z * z;
@@ -233,7 +258,7 @@ void InstrumentalSplittingRule::find_best_split_value(const Data& data,
       sum_left += sums[i];
       sum_left_z += sums_z[i];
       sum_left_z_squared += sums_z_squared[i];
-
+      double panelty_target_weight =  target_left_weights[i] ;
       // Skip this split if the left child does not contain enough
       // z values below and above the parent's mean.
       size_t num_left_large_z = n_left - num_left_small_z;
@@ -273,6 +298,14 @@ void InstrumentalSplittingRule::find_best_split_value(const Data& data,
       double decrease = sum_left * sum_left / weight_sum_left + sum_right * sum_right / weight_sum_right;
       // Penalize splits that are too close to the edges of the data.
       decrease -= imbalance_penalty * (1.0 / size_left + 1.0 / size_right);
+
+
+    // std::cout <<"Decrease:" << decrease  << "Instrument target weight:"<< panelty_target_weight<< std::flush << "\n";
+
+      // std::cout << "panelty_target_weight:"<<  panelty_target_weight << "\n";
+
+      decrease  -= decrease * panelty_target_weight + 1e-4;
+
 
       // Save this split if it is the best seen so far.
       if (decrease > best_decrease) {

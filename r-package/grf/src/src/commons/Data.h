@@ -64,6 +64,7 @@ public:
 
   void set_censor_index(size_t index);
 
+  void set_target_avg_weight(std::vector<double>);
   /**
    * Sorts and gets the unique values in `samples` at variable `var`.
    *
@@ -97,6 +98,8 @@ public:
 
   double get_weight(size_t row) const;
 
+  Eigen::VectorXf  get_target_avg_weights(size_t row) const; 
+
   double get_causal_survival_numerator(size_t row) const;
 
   double get_causal_survival_denominator(size_t row) const;
@@ -104,6 +107,7 @@ public:
   bool is_censored(size_t row) const;
 
   const std::set<size_t>& get_disallowed_split_variables() const;
+
 
 protected:
   size_t num_rows;
@@ -118,6 +122,8 @@ protected:
   nonstd::optional<size_t> causal_survival_numerator_index;
   nonstd::optional<size_t> causal_survival_denominator_index;
   nonstd::optional<size_t> censor_index;
+  Eigen::VectorXf target_avg_weights;
+
 
 private:
   DISALLOW_COPY_AND_ASSIGN(Data);

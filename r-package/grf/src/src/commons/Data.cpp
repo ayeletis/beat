@@ -215,7 +215,19 @@ namespace grf
     this->censor_index = index;
     disallowed_split_variables.insert(index);
   }
+  void Data::set_target_avg_weight(std::vector<double> weights)
+  {
 
+
+    Eigen::VectorXf vect_weights(weights.size());
+    for (size_t i = 0; i < weights.size(); i++)
+    {
+      vect_weights[i] = weights[i];
+    }
+    // Eigen::VectorXf vect_weights(weights.data());
+    this->target_avg_weights = vect_weights;
+    // this-> target_avg_weights = Eigen::VectorXf ;
+  }
   void Data::get_all_values(std::vector<double> &all_values,
                             std::vector<size_t> &sorted_samples,
                             const std::vector<size_t> &samples,
@@ -310,6 +322,11 @@ namespace grf
     {
       return 1.0;
     }
+  }
+
+  Eigen::VectorXf Data::get_target_avg_weights(size_t row) const
+  {
+    return target_avg_weights;
   }
   Eigen::VectorXf Data::get_target_weight(size_t row) const
   {

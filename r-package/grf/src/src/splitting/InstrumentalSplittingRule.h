@@ -69,7 +69,7 @@ private:
   uint min_node_size;
   double alpha;
   double imbalance_penalty;
-
+  double* target_left_weights;
   DISALLOW_COPY_AND_ASSIGN(InstrumentalSplittingRule);
 };
 

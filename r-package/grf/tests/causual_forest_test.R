@@ -27,26 +27,24 @@ p_demog = 1
 n = n1 + n2
 
 
-a =as.matrix( rnorm(1000, 2))
-b =  as.matrix(rbinom(1000, 5, 0.4)) * 100 * 0
-norm(a-b, '2') /(norm(a,'2') + norm(b,'2'))
-
-norm(scale(a)-scale(b), '2') /(norm(scale(a),'2'))
-
 set.seed(123456789)
 # Covariates = X_cont + Binary + Demog (binary)
 X_cont = matrix(rnorm(n*p_continuous), n, p_continuous)
 X_disc = matrix(rbinom(n*p_discrete, 1, 0.3),n,p_discrete)
-X_Z = rnorm(n, mean=4, sd=10)
 # Demographic variable correlated with X[,2]
-Z = rbinom(n, 1, 0.2) # This is to test whether grf_v2 gives same fit when Z is independent from X.
-# Z = rbinom(n, 1,  1/(1+exp(-(X_cont[,2]))))
-# check another correlation
+# Z = rbinom(n, 1, 0.2) # This is to test whether grf_v2 gives same fit when Z is independent from X.
+# Z = as.matrix(rbinom(n, 1, 1/(1+exp(-X_cont[,2]))))
+
+## high dimensions
+Z = sapply(1:50, function(x) as.matrix(rbinom(n, 1,  1/(1+exp(-(x*X_cont[,2]))))) )
+
+#  another correlation
+# X_Z = rnorm(n, mean=4, sd=10)
 # Z = sigmoid(X_cont[,2] + exp(X_Z) + X_Z * X_cont[,2])
 # Z = ifelse(Z>0.5, 1, 0)
-summary(Z)
 
-print(c("validity_check",mean(X_cont[Z==0,2]),mean(X_cont[Z==1,2])))
+
+print(c("validity_check",mean(X_cont[Z[,1]==0,2]),mean(X_cont[Z[,1]==1,2])))
 
 # For now, we assume that Z is not a covariate in the model
 X = cbind(X_cont,X_disc)
@@ -65,7 +63,7 @@ tau = tau_function(X)
 
 # Simulate 'Y'
 y_function <- function(x,z) {
-  temp <- x[,1] - 2*x[,2] + x[,4] + z  #   * runif(dim(X)[1]) + x[,4] * z * runif(dim(X)[1])
+  temp <- x[,1] - 2*x[,2] + x[,4] + rowMeans( z)
   return(temp)
 }
 noise_y = runif(n)
@@ -73,11 +71,13 @@ Y =  y_function(X,Z) + tau*W + noise_y
 
 
 # For now, let's use only train data
-train_data = data.frame(Y=Y[c(1:n1)],Z=Z[c(1:n1)],W=W[c(1:n1)],tau = tau[c(1:n1)],X=X[c(1:n1),])
-X_train = as.matrix(train_data[,c(5:dim(train_data)[2])])
+train_data = data.table(Y=Y[c(1:n1)],Z=Z[c(1:n1), ],W=W[c(1:n1)],tau = tau[c(1:n1)],X=X[c(1:n1),])
+x_cols = grep("X", names(train_data), value=TRUE)
+X_train = train_data[, .SD, .SDcols=x_cols]
 Y_train = train_data$Y
 W_train = train_data$W
-Z_train = train_data$Z #Hengyu, I started with Z being dim=1, but we can start with higher dimensionality
+Zcols =grep('Z', names(train_data), value=TRUE)
+Z_train = train_data[, .SD, .SDcols=Zcols]
 
 
 # validate_data = data.frame(Y=Y[c(n1:n2)],Z=Z[c(n1:n2)],W=W[c(n1:n2)],tau = tau[c(n1:n2)],X=X[c(n1:n2),])
@@ -88,18 +88,15 @@ Z_train = train_data$Z #Hengyu, I started with Z being dim=1, but we can start w
 
 
 ## Some validity plots
-if(TRUE) {
-data_to_plot = data.table(Y,W,Z, tau)
+if(FALSE) {
+data_to_plot = data.table(Y=Y,W=W,Z = Z[,1], tau)
 data_to_plot[, W:=as.character(W)]
 data_to_plot[, Z:=as.character(Z)]
-
 p_ate = ggdensity(data=data_to_plot, x='Y', color='W', fill='W', alpha=0.2, add = "mean")
 p_bias = ggdensity(data=data_to_plot, x='tau', color='Z', fill='Z', alpha=0.2, add = "mean")
-p_test = ggdensity(data=data_to_plot, x='Y', color='W', fill='W', alpha=0.2, facet.by = 'Z',
-          short.panel.labs = FALSE, add = "mean")
-
 grid.arrange(p_ate, p_bias, nrow = 1)
 
+# ggsave("density_diff.png",p, width=12, height=6)
 }
 
 
@@ -186,15 +183,16 @@ get_ecdf_values = function(x){
   return(list(v, ecdf(x)(v)))
 }
 
-data_to_plot = data.table(Z = Z_train,
+data_to_plot =  data.table(Z= Z_train[, 1],
                           tau_grf_no_weight = tau_train.grf$predictions,
                           tau_grf_with_weight = tau_train.grf_v2$predictions) #
+names(data_to_plot)[1] = 'Z'
 data_to_plot[, Z:=as.character(Z)]
 
 data_to_plot2 = melt(data_to_plot, id.vars = 'Z')
 
 ggdensity(data=data_to_plot2, x='value', color='Z', fill='Z', alpha=0.2, add = "mean",
           facet.by = 'variable', ncol=1
-          # ,title='Z is NOT correlated to X[,2]'
+          ,scales='free'
           )
-# ggsave("result_with_z_no_correlation.png", width=8, height=6)
+# ggsave("result_with_z_50_correlation.png", width = 8, height=6)
