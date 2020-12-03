@@ -12,6 +12,74 @@ Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
       - D is decrease in impurity
 * Package version is changed to 1.2.1
 
+## How Parameters Are Tuned: 
+* generate a small number random number with uniform distribution on [0, 1] (`num.fit.reps`=50 * num parameters)
+* generate values per parameter type (defined in `get_params_from_draw` in `tune.R` or check the code block below)
+* use those parameter grid to fit a model with small size tree (`num.fit.trees`=200) and calculate de-biased error
+* fit a Kriging model to predict expected error from a larger parameter grid (`num.optimize.reps`=1000 * num parameters)
+* pick the parameter set by the lowest error and refit a tree to get actual error
+* pick the best set from default parameter, user parameter, and tuned parameters by the lowest error value. 
+* (The original package ignore user input parameters as it compares the tuned against default set)
+
+### A Very Brief Explanation on Kriging model:
+Suppose we want to do a parameter grid search. The computation burden becomes large when the number of parameters and values are large. 10 parameters and 100 values each will results in fitting 1000 models. To speed up the process, we first use a small size parameter grid and use the model error to fit a model that predicts the expected error for larger set of parameters. 
+
+The Kriging model assumes the based on a set of parameter, the distribution of true model error conditioned on predicted error is normal, and the mean and variance depend on the parameter set. This method requires to center Y and X, so in `causal_forest` Y and W are centered before running causal analysis.
+
+Reference:
+>[Olivier Roustant, David Ginsbourger, Yves Deville.  DiceKriging, DiceOptim:  Two R packages forthe analysis of computer experiments by kriging-based metamodeling and optimization. 2010. ￿hal-00495766v2](https://hal.archives-ouvertes.fr/file/index/docid/499475/filename/DiceJSS.pdf)
+
+
+## Definition of Parameter Grid
+
+```R
+default.parameters <- list(sample.fraction = 0.5,
+                             mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                             min.node.size = 5,
+                             honesty.fraction = 0.5,
+                             honesty.prune.leaves = TRUE,
+                             alpha = 0.05,
+                             imbalance.penalty = 0,
+                             target.weight.penalty=0)
+```
+
+ ```R
+  get_params_from_draw <- function(nrow.X, ncol.X, draws) {
+    # draw is a vector of tunable parameter names
+  if (is.vector(draws)) {
+    draws <- rbind(c(draws))
+  }
+  n <- nrow(draws)
+  vapply(colnames(draws), function(param) {
+    if (param == "min.node.size") {
+      return(floor(2^(draws[, param] * (log(nrow.X) / log(2) - 4))))
+    } else if (param == "sample.fraction") {
+      return(0.05 + 0.45 * draws[, param])
+    } else if (param == "mtry") {
+      return(ceiling(min(ncol.X, sqrt(ncol.X) + 20) * draws[, param]))
+    } else if (param == "alpha") {
+      return(draws[, param] / 4)
+    } else if (param == "imbalance.penalty") {
+      return(-log(draws[, param]))
+    } else if (param == "honesty.fraction") {
+      return(0.5 + (0.8 - 0.5) * draws[, param]) # honesty.fraction in U(0.5, 0.8)
+    } else if (param == "honesty.prune.leaves") {
+      return(ifelse(draws[, param] < 0.5, TRUE, FALSE))
+    } else if (param=='target.weight.penalty') {
+      return(pmin(gamma(draws[,param]), 100)) # [0, 100]
+    }else {
+      stop("Unrecognized parameter name provided: ", param)
+    }
+  }, FUN.VALUE = numeric(n))}
+  ```
+
+
+### Distribution of target weight penalty.
+X is uniformly distributed from [0, 1]
+
+![img](images/target_weight_penalty_gamma_dist.png)  
+
+
 
 ## Potential Problems:
 * Curse of dimensionality?
