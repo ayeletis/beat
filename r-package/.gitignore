@@ -1,6 +1,6 @@
 # OS X files
 *.DS_Store
-
+*.dll
 # emacs files
 *~
 

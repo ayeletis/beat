@@ -17,6 +17,8 @@ sigmoid = function(x){
 relu = function(x){
   return(ifelse(x>0, x, 0))
 }
+
+
 num_trees = 4000
 
 n1 = 5000; #calibration
@@ -33,10 +35,14 @@ X_cont = matrix(rnorm(n*p_continuous), n, p_continuous)
 X_disc = matrix(rbinom(n*p_discrete, 1, 0.3),n,p_discrete)
 # Demographic variable correlated with X[,2]
 # Z = rbinom(n, 1, 0.2) # This is to test whether grf_v2 gives same fit when Z is independent from X.
-# Z = as.matrix(rbinom(n, 1, 1/(1+exp(-X_cont[,2]))))
+Z = as.matrix(rbinom(n, 1, sigmoid(X_cont[,2])))
 
 ## high dimensions
-Z = sapply(1:50, function(x) as.matrix(rbinom(n, 1,  1/(1+exp(-(x*X_cont[,2]))))) )
+
+# Z =matrix(nrow=n, ncol=2)
+# for(i in 1:2){
+#   Z[, i] = rbinom(n, 1, sigmoid(sample(c( exp, relu, sin, cos, tanh), 1)[[1]](X_cont[,2])))
+# }
 
 #  another correlation
 # X_Z = rnorm(n, mean=4, sd=10)
@@ -63,11 +69,12 @@ tau = tau_function(X)
 
 # Simulate 'Y'
 y_function <- function(x,z) {
-  temp <- x[,1] - 2*x[,2] + x[,4] + rowMeans( z)
+  temp <-  x[,1] - 2*x[,2] +  x[,4] + z #+ rowMeans( z)
   return(temp)
 }
 noise_y = runif(n)
 Y =  y_function(X,Z) + tau*W + noise_y
+Y_n = X[,1] - 2*X[,2] +  X[,4] + tau*W + noise_y
 
 
 # For now, let's use only train data
@@ -177,6 +184,7 @@ if(TRUE) {
 ## ---------------------------------------------------------
 ##   Explore the possible bias and whether V@ got rid of it
 ## ---------------------------------------------------------
+rsq <- function (x, y) cor(x, y) ^ 2
 
 get_ecdf_values = function(x){
   v = seq(0, 1, 0.01)
@@ -191,8 +199,21 @@ data_to_plot[, Z:=as.character(Z)]
 
 data_to_plot2 = melt(data_to_plot, id.vars = 'Z')
 
-ggdensity(data=data_to_plot2, x='value', color='Z', fill='Z', alpha=0.2, add = "mean",
+ggdensity(data=data_to_plot2, x='value',
+          color='Z', fill='Z',
+          alpha=0.2, add = "mean",
           facet.by = 'variable', ncol=1
           ,scales='free'
           )
 # ggsave("result_with_z_50_correlation.png", width = 8, height=6)
+dat = data.table(
+  tau_true = tau,
+  tau_pred_no_weights = tau_train.grf$predictions,
+  tau_pred_weights= tau_train.grf_v2$predictions
+)
+dat[, idx:=1:.N]
+dat = melt(dat, id.vars = 'idx')
+ggline(data=dat, x='idx', y='value', color='variable')
+
+ggecdf(data=dat, x='value', color='variable')
+ggsave("prediction_ecdf.png", width = 8, height=6)

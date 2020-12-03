@@ -36,6 +36,7 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
                         size_t sample_weight_index,
                         std::vector<size_t> target_weights_index,
                         std::vector<double> target_avg_weights,
+                        double target_weight_penalty,
                         bool use_sample_weights,
                         bool use_target_index,
                         unsigned int mtry,
@@ -66,7 +67,7 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
   }
 
   data->set_target_index(target_weights_index);
-  data->set_target_avg_weight(target_avg_weights);
+  data->set_target_avg_weight(target_avg_weights, target_weight_penalty);
 
   ForestOptions options(num_trees, ci_group_size, sample_fraction, mtry, min_node_size, honesty,
                         honesty_fraction, honesty_prune_leaves, alpha, imbalance_penalty, num_threads, seed, clusters, samples_per_cluster);

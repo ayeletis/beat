@@ -109,7 +109,8 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max),
                               target.weights= NULL,
-                              target.avg.weights=NULL) {
+                              target.avg.weights=NULL,
+                              target.weight.penalty=0) {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
@@ -119,7 +120,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
 
   default.parameters <- list(sample.fraction = 0.5,
                              mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
@@ -127,7 +128,18 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                              honesty.fraction = 0.5,
                              honesty.prune.leaves = TRUE,
                              alpha = 0.05,
-                             imbalance.penalty = 0)
+                             imbalance.penalty = 0,
+                             target.weight.penalty=1)
+
+  userinput.parameters <- list(
+                            sample.fraction = sample.fraction,
+                            mtry =mtry,
+                            min.node.size = min.node.size,
+                            honesty.fraction = honesty.fraction,
+                            honesty.prune.leaves = honesty.prune.leaves,
+                            alpha = alpha,
+                            imbalance.penalty = imbalance.penalty,
+                            target.weight.penalty=target.weight.penalty )
 
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
@@ -150,7 +162,9 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                num.threads = num.threads,
                seed = seed,
                reduced.form.weight = 0,
-               target.avg.weights=target.avg.weights)
+               #target.weights=target.weights,
+               target.avg.weights=target.avg.weights,
+               target.weight.penalty=target.weight.penalty)
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params
@@ -162,6 +176,8 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   }
 
   tune.parameters.defaults <- default.parameters[tune.parameters]
+  tune.parameters.userinput <- userinput.parameters[tune.parameters]
+
   train <- causal_train
 
   tuning.output <- tune_forest(data = data,
@@ -170,6 +186,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                                args = args,
                                tune.parameters = tune.parameters,
                                tune.parameters.defaults = tune.parameters.defaults,
+                               tune.parameters.userinput = tune.parameters.userinput,
                                num.fit.trees = tune.num.trees,
                                num.fit.reps = tune.num.reps,
                                num.optimize.reps = tune.num.draws,

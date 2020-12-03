@@ -109,7 +109,13 @@ print.tuning_output <- function(x, tuning.quantiles = seq(0, 1, 0.2), ...) {
     cat("However, we could not find parameters that were expected to perform better than default: \n\n")
     params <- x$params
     cat(paste0(names(params), ": ", params, "\n"))
-  } else if (x$status == "tuned") {
+  } else if (x$status=='user_input'){
+    cat("Tuning status: user input. \n")
+    cat("This indicates user input parameters are better than tuning and default parameters. ")
+    params <-x$params
+    cat(paste0(names(params), ": ", params, "\n"))
+  }
+  else if (x$status == "tuned") {
     cat("Tuning status: tuned.\n")
     cat("This indicates tuning found parameters that are expected to perform better than default. \n\n")
     grid <- x$grid

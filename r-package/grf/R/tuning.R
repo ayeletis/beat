@@ -25,6 +25,7 @@ tune_forest <- function(data,
                         args,
                         tune.parameters,
                         tune.parameters.defaults,
+                        tune.parameters.userinput,
                         num.fit.trees,
                         num.fit.reps,
                         num.optimize.reps,
@@ -110,21 +111,48 @@ tune_forest <- function(data,
   default.forest <- do.call.rcpp(train, c(data, fit.parameters, tune.parameters.defaults))
   default.forest.error <- mean(default.forest$debiased.error, na.rm = TRUE)
 
-  if (default.forest.error < retrained.forest.error) {
-    out <- get_tuning_output(
-      error = default.forest.error,
-      params = tune.parameters.defaults,
-      grid = NA,
-      status = "default"
-    )
-  } else {
-    out <- get_tuning_output(
-      error = retrained.forest.error,
-      params = retrained.forest.params,
-      grid = grid,
-      status = "tuned"
-    )
-  }
+  # 5. check user input parameters
+
+  user.forest <- do.call.rcpp(train, c(data, fit.parameters, tune.parameters.userinput))
+  user.forest.error <- mean(user.forest$debiased.error, na.rm = TRUE)
+  # print(tune.parameters.userinput)
+  results =list(list('error'=default.forest.error,
+                     'params'=tune.parameters.defaults,
+                      grid=NA,
+                      status='default'),
+                list('error' =retrained.forest.error,
+                     'params' = sapply(retrained.forest.params, list),
+                     grid=grid,
+                     status='tuned'),
+                list('error' =user.forest.error,
+                     'params'=tune.parameters.userinput,
+                     grid=NA,
+                     status='user_input'))
+
+  best = which.max(c(default.forest.error,retrained.forest.error,user.forest.error))
+  # print(sprintf("user input error: %s default input error %s tuning parameters error %s",
+  #               user.forest.error, default.forest.error,retrained.forest.error))
+  out <- get_tuning_output(
+    error = results[[best]]$error,
+    params=results[[best]]$params,
+    grid=results[[best]]$grid,
+    status = results[[best]]$status
+  )
+  # if (default.forest.error < retrained.forest.error) {
+  #   out <- get_tuning_output(
+  #     error = default.forest.error,
+  #     params = tune.parameters.defaults,
+  #     grid = NA,
+  #     status = "default"
+  #   )
+  # } else {
+  #   out <- get_tuning_output(
+  #     error = retrained.forest.error,
+  #     params = retrained.forest.params,
+  #     grid = grid,
+  #     status = "tuned"
+  #   )
+  # }
 
   out
 }
@@ -149,7 +177,9 @@ get_params_from_draw <- function(nrow.X, ncol.X, draws) {
       return(0.5 + (0.8 - 0.5) * draws[, param]) # honesty.fraction in U(0.5, 0.8)
     } else if (param == "honesty.prune.leaves") {
       return(ifelse(draws[, param] < 0.5, TRUE, FALSE))
-    } else {
+    } else if (param=='target.weight.penalty') {
+      return(pmin(gamma(draws[,param]), 100)) # [0, 100]
+    }else {
       stop("Unrecognized parameter name provided: ", param)
     }
   }, FUN.VALUE = numeric(n))

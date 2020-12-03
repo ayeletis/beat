@@ -1,0 +1,173 @@
+
+# install.packages("grf")
+library(grf)
+
+
+
+library(ggplot2)
+library(data.table)
+library(ggpubr)
+library(gridExtra)
+library(dplyr)
+
+# Empty workspace
+rm(list = ls())
+
+sigmoid <- function(x) {
+  return(1 / (1 + exp(-x)))
+}
+relu <- function(x) {
+  return(ifelse(x > 0, x, 0))
+}
+
+n1 <- 5000
+# calibration
+n2 <- 1000
+# validation
+p_continuous <- 4
+p_discrete <- 1
+p_demog <- 1
+n <- n1 + n2
+
+
+set.seed(123456789)
+
+# Covariates = X_cont + Binary + Demog (binary)
+X_cont <- matrix(rnorm(n * p_continuous), n, p_continuous)
+X_disc <- matrix(rbinom(n * p_discrete, 1, 0.3), n, p_discrete)
+
+# Demographic variable correlated with X[,2]
+# Z = as.matrix(rbinom(n, 1, 0.2)) # This is to test whether grf_v2 gives same fit when Z is independent from X.
+# Z = as.matrix(rbinom(n, 1, 1/(1+exp(-X_cont[,2]))))
+
+## Higher dimension for demographics -- 1 of them related to X_cont[,2], two other binary and a continuous, all independent
+Z <- sapply(1:1, function(x) as.matrix(rbinom(n, 1, 1 / (1 + exp(-X_cont[, 2])))))
+Z <- cbind(Z, rbinom(n, 1, 0.2), rbinom(n, 1, 0.7), rnorm(n, 0, 1)) #
+
+# print(c("validity_check for X,Z dependency",mean(X_cont[Z[,1]==0,2]),mean(X_cont[Z[,1]==1,2])))
+
+
+# For now, we assume that Z is not a covariate in the model
+X <- cbind(X_cont, X_disc)
+p <- p_continuous + p_discrete
+
+# Random assigment
+W <- rbinom(n, 1, 0.5)
+
+# Simulate 'tau' -- TAU depends on X[2] but no on Z
+tau_function <- function(x) {
+  temp <- (-1 + pmax(x[, 1], 0) + x[, 2] + abs(x[, 3]) + x[, 5])
+  return(temp)
+}
+tau <- tau_function(X)
+
+# Simulate 'Y'
+y_function <- function(x, z) {
+  temp <- x[, 1] - 2 * x[, 2] + x[, 4] + z[, 1]
+  return(temp)
+}
+noise_y <- runif(n)
+Y <- y_function(X, Z) + tau * W + noise_y
+
+
+# For now, let's use only train data
+train_data <- data.table(Y = Y[c(1:n1)], Z = Z[c(1:n1), ], W = W[c(1:n1)], tau = tau[c(1:n1)], X = X[c(1:n1), ])
+x_cols <- grep("X", names(train_data), value = TRUE)
+X_train <- train_data[, .SD, .SDcols = x_cols]
+Y_train <- train_data$Y
+W_train <- train_data$W
+Zcols <- grep("Z", names(train_data), value = TRUE)
+Z_train <- train_data[, .SD, .SDcols = Zcols]
+
+
+# validate_data = data.frame(Y=Y[c(n1:n2)],Z=Z[c(n1:n2)],W=W[c(n1:n2)],tau = tau[c(n1:n2)],X=X[c(n1:n2),])
+# X_validate = as.matrix(validate_data[,c(5:dim(validate_data)[2])])
+# Y_validate = validate_data$Y
+# W_validate = validate_data$W
+# Z_validate = validate_data$Z
+
+
+## Some validity plots to make sure that tau discriminates in Z
+if (FALSE) {
+  data_to_plot <- data.table(Y = Y, W = W, Z = Z[, 1], tau)
+  data_to_plot[, W := as.character(W)]
+  data_to_plot[, Z := as.character(Z)]
+  p_ate <- ggdensity(data = data_to_plot, x = "Y", color = "W", fill = "W", alpha = 0.2, add = "mean")
+  p_bias <- ggdensity(data = data_to_plot, x = "tau", color = "Z", fill = "Z", alpha = 0.2, add = "mean")
+  grid.arrange(p_ate, p_bias, nrow = 1)
+}
+
+
+## ---------------------------------------------------
+##   Estimate 'tau' using GRF
+## ---------------------------------------------------
+num_trees <- 4000
+all_tuning_param <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction", "honesty.prune.leaves", "alpha", "imbalance.penalty")
+my_tuning_param <- all_tuning_param[1:7]
+
+# propensity scores
+forest.W <- regression_forest(X_train, W_train, tune.parameters = all_tuning_param)
+W.hat <- predict(forest.W)$predictions
+
+
+# Y_hat, for GRF
+forest.Y <- regression_forest(X_train, Y_train, tune.parameters = all_tuning_param)
+Y.hat <- predict(forest.Y)$predictions
+
+# Set spect for regular forest
+# my_tuning_param = c("none")
+
+
+# Estimate REGULAR Causal forest (using 'grf' package)
+start.time <- Sys.time()
+
+fit_grf <- causal_forest(X_train, Y_train, W_train,
+                         honesty = TRUE,
+                         W.hat = W.hat, Y.hat = Y.hat,
+                         num.trees = num_trees,
+                         # tune.parameters = my_tuning_param,
+                         seed=1
+)
+end.time <- Sys.time()
+time_cf_estim <- end.time - start.time
+print(time_cf_estim)
+tau_train.grf <- predict(fit_grf, estimate.variance = TRUE) # newdata=X_validate,
+
+
+# Estimate Causal forest with TARGET WEIGHTS, using the tuneable parameters from the regular forest
+start.time <- Sys.time()
+fit_grf_v2 <- causal_forest(X_train, Y_train, W_train,
+                            target.weights = as.matrix(Z_train),
+                            target.weight.penalty = 1,
+                            honesty = TRUE,
+                            W.hat = W.hat, Y.hat = Y.hat,
+                            num.trees = num_trees,
+                            # tune.parameters ='target.weight.penalty',#c('target.weight.penalty',my_tuning_param), # "target.weight.penalty",# my_tuning_param, # "none",
+                            # sample.fraction = fit_grf$tuning.output$params$sample.fraction,
+                            # mtry = fit_grf$tuning.output$params$mtry,
+                            # min.node.size = fit_grf$tuning.output$params$min.node.size,
+                            # honesty.fraction = fit_grf$tuning.output$params$honesty.fraction,
+                            # honesty.prune.leaves = fit_grf$tuning.output$params$honesty.prune.leaves,
+                            # alpha = fit_grf$tuning.output$params$alpha,
+                            # imbalance.penalty = fit_grf$tuning.output$params$imbalance.penalty,
+                            num.threads = 1,
+                            seed=1
+)
+
+tau_train.grf_v2 <- predict(fit_grf_v2, estimate.variance = TRUE) # newdata=X_validate,
+
+data_to_plot <- data.table(
+  Z = Z_train[, 1],
+  tau_grf_no_weight = tau_train.grf$predictions,
+  tau_grf_with_weight = tau_train.grf_v2$predictions
+) #
+names(data_to_plot)[1] <- "Z"
+data_to_plot[, Z := as.character(Z)]
+
+data_to_plot2 <- melt(data_to_plot, id.vars = "Z")
+
+ggdensity(
+  data = data_to_plot2, x = "value", color = "Z", fill = "Z", alpha = 0.2, add = "mean",
+  facet.by = "variable", ncol = 1,
+  scales = "free_y"
+)
