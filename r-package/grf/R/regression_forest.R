@@ -90,8 +90,6 @@
 regression_forest <- function(X, Y,
                               num.trees = 2000,
                               sample.weights = NULL,
-                              target.weights = NULL,
-                              target.weight.penalty = 0,
                               clusters = NULL,
                               equalize.cluster.weights = FALSE,
                               sample.fraction = 0.5,
@@ -117,21 +115,16 @@ regression_forest <- function(X, Y,
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
 
-  if(is.null(target.weights) | isFALSE(target.weights)){
-    target.weights = as.matrix(replicate(NROW(X), 1))
-  }
-  target.avg.weights = colMeans(target.weights, na.rm=TRUE)
+
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
 
-  data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights, target.weights=target.weights)
+  data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
   args <- list(num.trees = num.trees,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
                sample.fraction = sample.fraction,
-               target.avg.weights =  target.avg.weights,
-               target.weight.penalty=target.weight.penalty,
                mtry = mtry,
                min.node.size = min.node.size,
                honesty = honesty,
@@ -148,9 +141,6 @@ regression_forest <- function(X, Y,
   if (!identical(tune.parameters, "none")){
     tuning.output <- tune_regression_forest(X, Y,
                                             sample.weights = sample.weights,
-                                            target.weights = target.weights,
-                                            target.avg.weights =  target.avg.weights,
-                                            target.weight.penalty=target.weight.penalty,
                                             clusters = clusters,
                                             equalize.cluster.weights = equalize.cluster.weights,
                                             sample.fraction = sample.fraction,

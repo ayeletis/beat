@@ -21,7 +21,7 @@
 #include <iostream>
 #include <set>
 #include <vector>
-
+#include <Rcpp.h>
 #include "Eigen/Dense"
 #include "globals.h"
 #include "optional/optional.hpp"
@@ -58,15 +58,16 @@ namespace grf
 
     void set_weight_index(size_t index);
 
-    void set_target_index(const std::vector<size_t> &index);
-
     void set_causal_survival_numerator_index(size_t index);
 
     void set_causal_survival_denominator_index(size_t index);
 
     void set_censor_index(size_t index);
 
-    void set_target_avg_weight(std::vector<double>, const double);
+    void set_target_avg_weights(Rcpp::List x);
+
+    void set_target_weight_penalty(double target_weight_penalty);
+
     /**
    * Sorts and gets the unique values in `samples` at variable `var`.
    *
@@ -92,15 +93,11 @@ namespace grf
 
     Eigen::VectorXd get_outcomes(size_t row) const;
 
-    Eigen::VectorXf get_target_weight(size_t row) const;
-
     double get_treatment(size_t row) const;
 
     double get_instrument(size_t row) const;
 
     double get_weight(size_t row) const;
-
-    Eigen::VectorXf get_target_avg_weights(size_t row) const;
 
     double get_causal_survival_numerator(size_t row) const;
 
@@ -110,8 +107,17 @@ namespace grf
 
     const std::set<size_t> &get_disallowed_split_variables() const;
 
+    // Rcpp::NumericVector get_target_avg_weights(size_t var, size_t row) const;
+    Eigen::MatrixXd get_target_avg_weights(size_t var);
+
+    double get_target_weight_penalty() const;
+
+    // size_t get_target_weight_ncols() const;
     double target_weight_penalty;
-    Eigen::VectorXf target_avg_weights;
+
+    // Rcpp::List target_avg_weights;
+
+    std::vector<Eigen::MatrixXd> target_avg_weights;
 
   protected:
     size_t num_rows;
@@ -122,10 +128,11 @@ namespace grf
     nonstd::optional<size_t> treatment_index;
     nonstd::optional<size_t> instrument_index;
     nonstd::optional<size_t> weight_index;
-    nonstd::optional<std::vector<size_t>> target_index;
+    // nonstd::optional<std::vector<size_t>> target_index;
     nonstd::optional<size_t> causal_survival_numerator_index;
     nonstd::optional<size_t> causal_survival_denominator_index;
     nonstd::optional<size_t> censor_index;
+    // attributes
 
   private:
     DISALLOW_COPY_AND_ASSIGN(Data);

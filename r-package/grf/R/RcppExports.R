@@ -17,8 +17,8 @@ merge <- function(forest_objects) {
     .Call('_grf_merge', PACKAGE = 'grf', forest_objects)
 }
 
-causal_train <- function(train_matrix, sparse_train_matrix, outcome_index, treatment_index, sample_weight_index, target_weights_index, target_avg_weights, target_weight_penalty, use_sample_weights, use_target_index, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, reduced_form_weight, alpha, imbalance_penalty, stabilize_splits, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
-    .Call('_grf_causal_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, treatment_index, sample_weight_index, target_weights_index, target_avg_weights, target_weight_penalty, use_sample_weights, use_target_index, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, reduced_form_weight, alpha, imbalance_penalty, stabilize_splits, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
+causal_train <- function(train_matrix, sparse_train_matrix, outcome_index, treatment_index, sample_weight_index, target_avg_weights, target_weight_penalty, use_sample_weights, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, reduced_form_weight, alpha, imbalance_penalty, stabilize_splits, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
+    .Call('_grf_causal_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, treatment_index, sample_weight_index, target_avg_weights, target_weight_penalty, use_sample_weights, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, reduced_form_weight, alpha, imbalance_penalty, stabilize_splits, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
 }
 
 causal_predict <- function(forest_object, train_matrix, sparse_train_matrix, outcome_index, treatment_index, test_matrix, sparse_test_matrix, num_threads, estimate_variance) {
@@ -109,8 +109,8 @@ quantile_predict_oob <- function(forest_object, quantiles, train_matrix, sparse_
     .Call('_grf_quantile_predict_oob', PACKAGE = 'grf', forest_object, quantiles, train_matrix, sparse_train_matrix, outcome_index, num_threads)
 }
 
-regression_train <- function(train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, target_weights_index, target_avg_weights, target_weight_penalty, use_sample_weights, use_target_index, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
-    .Call('_grf_regression_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, target_weights_index, target_avg_weights, target_weight_penalty, use_sample_weights, use_target_index, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
+regression_train <- function(train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
+    .Call('_grf_regression_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
 }
 
 regression_predict <- function(forest_object, train_matrix, sparse_train_matrix, outcome_index, test_matrix, sparse_test_matrix, num_threads, estimate_variance) {

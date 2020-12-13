@@ -107,22 +107,16 @@ fit_grf <- causal_forest(X_train, Y_train, W_train,
 )
 
 fit_grf2 <- causal_forest(X_train, Y_train, W_train,
+                          target.weights = as.matrix(Z_train),
+                          target.weight.penalty = 50,
                          honesty = TRUE,
-                         W.hat = 0, Y.hat = 0,
                          num.trees = num_trees,
                          # tune.parameters = my_tuning_param,
                          seed=1
 )
 tau_1 = predict(fit_grf)
 tau_2 = predict(fit_grf2)
-out = data.table(y = tau[1:n1],
-                 y_org = c(fit_grf$predictions),
-                 y_no = c(fit_grf2$predictions))
-out[, (cor(y, y_org)^2)]
-out[, (cor(y, y_no)^2)]
-
-ggline(data=out, x='y', y='y_org', numeric.x.axis = TRUE)
-ggline(data=out, x='y', y='y_no', numeric.x.axis = TRUE)
+plot(tau_1$predictions, tau_2$predictions)
 
 
 ## ---------------------------------------------------

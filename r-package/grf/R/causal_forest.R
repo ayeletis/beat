@@ -145,7 +145,10 @@ causal_forest <- function(X,
                           num.trees = 2000,
                           sample.weights = NULL,
                           target.weights = NULL,
-                          target.weight.penalty = 0,
+                          target.weights.hat = NULL,
+                          target.weight.penalty = NULL,
+                          target.weight.bins.breaks = 256,
+                          target.weight.demean = FALSE,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -166,15 +169,17 @@ causal_forest <- function(X,
                           orthog.boosting = FALSE,
                           num.threads = NULL,
                           seed = runif(1, 0, .Machine$integer.max)) {
+
   has.missing.values <- validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   W <- validate_observations(W, X)
 
+  # target weight
   if (is.null(target.weights) | isFALSE(target.weights)) {
-    target.weights <- as.matrix(replicate(NROW(X), 1))
+    target.weights <- as.matrix(replicate(NROW(X), 0))
+    # stop()
   }
-  target.avg.weights <- colMeans(target.weights, na.rm = TRUE)
 
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <-
@@ -210,7 +215,7 @@ causal_forest <- function(X,
     imbalance.penalty = imbalance.penalty,
     ci.group.size = 1,
     tune.parameters = tune.parameters,
-    num.threads = num.threads,
+    #num.threads = num.threads,
     seed = seed # ,
   )
 
@@ -240,19 +245,47 @@ causal_forest <- function(X,
     stop("W.hat has incorrect length.")
   }
 
+  # orthog target weight matrix for multi reg
+  args.target = copy(args.orthog)
+  remove_args = c("ci.group.size",'tune.parameters')
+  for(i in remove_args){
+    args.target[i] = NULL
+  }
+
+  # if(sum(abs(target.weights))>0){
+  #   if (is.null(target.weights.hat) && !orthog.boosting) {
+  #     forest.weight <- do.call(multi_regression_forest, c(Y = list(target.weights), args.target))
+  #     target.weights.hat <- predict(forest.weight)$predictions
+  #   } else if (is.null(target.weights.hat) && orthog.boosting) {
+  #     forest.weight <-
+  #       do.call(boosted_regression_forest, c(Y = list(target.weights), args.target))
+  #     target.weights.hat <- predict(forest.weight)$predictions
+  #   } else if (length(target.weights.hat) == 1) {
+  #     target.weights.hat <- rep(target.weights.hat, nrow(X))
+  #   } else if (length(target.weights.hat) != nrow(X)) {
+  #     stop("Target weight has incorrect length.")
+  #   }
+  # }else{
+  #   target.weights.hat = target.weights
+  # }
+
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
+  target.weights.centered =  target.weights #- target.weights.hat #
+
+  # output list : [num x feture] [[num rows, num target weight feature]]
+  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights.centered,
+                                                    num_breaks = target.weight.bins.breaks,
+                                                    demean=target.weight.demean)
   data <- create_train_matrices(
     X,
     outcome = Y.centered,
     treatment = W.centered,
-    sample.weights = sample.weights,
-    target.weights = target.weights
-  )
+    sample.weights = sample.weights)
   args <- list(
     num.trees = num.trees,
     target.avg.weights = target.avg.weights,
-    target.weight.penalty=target.weight.penalty,
+    target.weight.penalty = target.weight.penalty,
     clusters = clusters,
     samples.per.cluster = samples.per.cluster,
     sample.fraction = sample.fraction,
@@ -280,9 +313,8 @@ causal_forest <- function(X,
       Y.hat,
       W.hat,
       sample.weights = sample.weights,
-      target.weights = target.weights,
-      target.avg.weights =  target.avg.weights,
-      target.weight.penalty=target.weight.penalty,
+      target.avg.weights = target.avg.weights,
+      target.weight.penalty = target.weight.penalty,
       clusters = clusters,
       equalize.cluster.weights = equalize.cluster.weights,
       sample.fraction = sample.fraction,
@@ -384,7 +416,6 @@ causal_forest <- function(X,
 #' c.forest <- causal_forest(X, Y, W, num.trees = 500)
 #' c.pred <- predict(c.forest, X.test, estimate.variance = TRUE)
 #' }
-#'
 #' @method predict causal_forest
 #' @export
 predict.causal_forest <- function(object,
@@ -400,8 +431,9 @@ predict.causal_forest <- function(object,
 
   # If possible, use pre-computed predictions.
   if (is.null(newdata) &&
-      !estimate.variance &&
-      !local.linear && !is.null(object$predictions)) {
+    !estimate.variance &&
+    !local.linear &&
+    !is.null(object$predictions)) {
     return(
       data.frame(
         predictions = object$predictions,
@@ -418,7 +450,7 @@ predict.causal_forest <- function(object,
   W.centered <- object[["W.orig"]] - object[["W.hat"]]
   target.weights <-
     train.data <-
-    create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
+      create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
 
   if (local.linear) {
     linear.correction.variables <-
@@ -471,4 +503,38 @@ predict.causal_forest <- function(object,
   empty <- sapply(ret, function(elem)
     length(elem) == 0)
   do.call(cbind.data.frame, ret[!empty])
+}
+
+
+construct_target_weight_mean = function(x, z, num_breaks = 256, demean=TRUE) {
+  calculate_avg = function(dat, x_col, z_col, num_breaks) {
+    df = dat[, .SD, .SDcols = c(x_col, z_col)]
+    df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
+
+    df[, mean_value := mean(get(z_col)), by = cut_bins]
+    # out = df[, mean_value] # if z is orthogonal (z hat)
+    if(isTRUE(demean)){
+      out = df[, mean_value - mean(mean_value)]
+    }else{
+      out = df[, mean_value]
+    }
+    return(out)
+  }
+
+  stopifnot(is.matrix(z))
+  stopifnot(dim(x)[1] == dim(z)[1])
+  dat = as.data.table(x)
+  x_cols = paste0('x_', 1:dim(x)[2])
+  names(dat) = x_cols
+  dat_z = as.data.table(z)
+  z_cols = paste0("z_", 1:dim(z)[2])
+  names(dat_z) = z_cols
+  dat = cbind(dat, dat_z)
+  # output matrix: 3D [var, n, z]
+  out = vector('list', length = length(x_cols))
+  for (i in 1:length(x_cols)) {
+    out[[i]] = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
+  }
+
+  return(out)
 }

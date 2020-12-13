@@ -56,7 +56,14 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "thread": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "core": "cpp",
+        "eigen": "cpp",
+        "dense": "cpp",
+        "csetjmp": "cpp",
+        "unordered_set": "cpp",
+        "iomanip": "cpp",
+        "cinttypes": "cpp"
     },
     "cmake.configureOnOpen": true
 }

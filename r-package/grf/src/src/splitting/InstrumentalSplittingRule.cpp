@@ -17,9 +17,9 @@
 
 #include <algorithm>
 #include <cmath>
-
+#include <Rcpp.h>
 #include "InstrumentalSplittingRule.h"
-
+#include <RcppEigen.h>
 namespace grf
 {
 
@@ -36,7 +36,7 @@ namespace grf
     this->num_small_z = new size_t[max_num_unique_values];
     this->sums_z = new double[max_num_unique_values];
     this->sums_z_squared = new double[max_num_unique_values];
-    this->target_left_weights = new double[max_num_unique_values];
+    // this->target_avg_weights = new Eigen::MatrixXf ;
   }
 
   InstrumentalSplittingRule::~InstrumentalSplittingRule()
@@ -65,10 +65,10 @@ namespace grf
     {
       delete[] num_small_z;
     }
-    if (target_left_weights != nullptr)
-    {
-      delete[] target_left_weights;
-    }
+    // if (target_avg_weights != nullptr)
+    // {
+    //   delete target_avg_weights;
+    // }
   }
 
   bool InstrumentalSplittingRule::find_best_split(const Data &data,
@@ -174,7 +174,6 @@ namespace grf
     std::fill(num_small_z, num_small_z + num_splits, 0);
     std::fill(sums_z, sums_z + num_splits, 0);
     std::fill(sums_z_squared, sums_z_squared + num_splits, 0);
-    std::fill(target_left_weights, target_left_weights + num_splits, 0);
 
     size_t n_missing = 0;
     double weight_sum_missing = 0;
@@ -183,21 +182,20 @@ namespace grf
     double sum_z_squared_missing = 0;
     size_t num_small_z_missing = 0;
 
-    // target weights
-    double target_weight_penalty = data.target_weight_penalty;
-    Eigen::VectorXf target_avg_weight = data.target_avg_weights;
-    Eigen::MatrixXf target_weights_matrix(num_samples, data.get_target_weight(1).size());
+    // target weight penalty
+    double target_weight_penalty = data.get_target_weight_penalty();
+    Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var]; //data.get_target_avg_weights(var);
 
-    for (size_t i = 0; i < num_samples; i++)
+    Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
+
+    if (target_weight_penalty > 0)
     {
-      target_weights_matrix.row(i) = data.get_target_weight(sorted_samples[i]);
+      for (size_t i = 0; i < num_samples; i++)
+      {
+        target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
+      }
     }
-
-    // Eigen::VectorXf target_avg_weight = data.get_target_avg_weights(1); // mean per target column
-    float target_l2_norm = target_avg_weight.lpNorm<2>();
-
-    // std::cout << "Target avg weight:"<<  target_avg_weight << "\n";
-    // std::cout << "Instrument target_avg_weight: " << target_avg_weight[0] << "\n" << std::flush;
+    // std::cout << "var: " << var << "; penalty:" << target_weight_penalty << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
 
     size_t split_index = 0;
     for (size_t i = 0; i < num_samples - 1; i++)
@@ -226,13 +224,6 @@ namespace grf
         weight_sums[split_index] += sample_weight;
         sums[split_index] += sample_weight * responses_by_sample(sample);
         ++counter[split_index];
-
-        Eigen::VectorXf sample_target_left = target_weights_matrix.topRows(i).colwise().mean();
-        Eigen::VectorXf sample_target_right = target_weights_matrix.bottomRows(num_samples - i).colwise().mean();
-
-        // target_left_weights[split_index] = (target_avg_weight - sample_target_left).lpNorm<1>()/(target_avg_weight.lpNorm<1>() + sample_target_left.lpNorm<1>()) ;
-        target_left_weights[split_index] =  (target_avg_weight - sample_target_left).lpNorm<2>() / (target_l2_norm + sample_target_left.lpNorm<2>()); 
-                                          //  (num_samples - i)/num_samples   * (target_avg_weight - sample_target_right).lpNorm<2>() / (target_l2_norm + sample_target_right.lpNorm<2>());
 
         sums_z[split_index] += sample_weight * z;
         sums_z_squared[split_index] += sample_weight * z * z;
@@ -292,7 +283,7 @@ namespace grf
         sum_left += sums[i];
         sum_left_z += sums_z[i];
         sum_left_z_squared += sums_z_squared[i];
-        double panelty_target_weight = target_left_weights[i];
+
         // Skip this split if the left child does not contain enough
         // z values below and above the parent's mean.
         size_t num_left_large_z = n_left - num_left_small_z;
@@ -333,19 +324,20 @@ namespace grf
         }
 
         // Calculate the decrease in impurity.
-        double decrease = sum_left * sum_left / weight_sum_left + sum_right * sum_right / weight_sum_right;
+        double decrease_left = sum_left * sum_left / weight_sum_left;
+        double decrease_right = sum_right * sum_right / weight_sum_right;
+        double decrease = decrease_left + decrease_right;
         // Penalize splits that are too close to the edges of the data.
         decrease -= imbalance_penalty * (1.0 / size_left + 1.0 / size_right);
+        if (target_weight_penalty > 0)
+        {
+          Eigen::VectorXd left_target_avg_weight = target_avg_weights_sorted.topRows(n_left).colwise().mean();
+          Eigen::VectorXd right_target_avg_weight = target_avg_weights_sorted.bottomRows(n_right).colwise().mean();
 
-        // std::cout << "Decrease:" << decrease << "Instrument target weight:" << panelty_target_weight << std::flush << "\n";
-        double penalty = decrease * panelty_target_weight * target_weight_penalty;
-        decrease -= penalty; // decrease *
-        // std::cout << "causal panelty_target_weight:"<<  panelty_target_weight << "new decrease " << decrease << "\n";
-        // if (decrease < 0)
-        // {
-        //   std::cout << "causal panelty_target_weight:" << panelty_target_weight << "\n";
-        //   throw std::invalid_argument("causal");
-        // }
+          double penalty_target_weight = left_target_avg_weight.lpNorm<2>() * decrease_left + right_target_avg_weight.lpNorm<2>() * decrease_right; /// weight_sum_left   / weight_sum_right
+          // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
+          decrease -= penalty_target_weight * target_weight_penalty;
+        }
 
         // Save this split if it is the best seen so far.
         if (decrease > best_decrease)

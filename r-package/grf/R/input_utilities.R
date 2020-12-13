@@ -184,8 +184,7 @@ create_train_matrices <- function(X,
                                   survival.numerator = NULL,
                                   survival.denominator = NULL,
                                   censor = NULL,
-                                  sample.weights = FALSE,
-                                  target.weights=NULL) {
+                                  sample.weights = FALSE) {
   default.data <- matrix(nrow = 0, ncol = 0)
   sparse.data <- new("dgCMatrix", Dim = c(0L, 0L))
   out <- list()
@@ -228,20 +227,12 @@ create_train_matrices <- function(X,
       out[["use.sample.weights"]] <- TRUE
     }
   }
-  if (!is.null(target.weights)){
-    out[['target.weights.index']] <- (offset + 1):(offset + NCOL(target.weights))
-    offset <- offset + NCOL(target.weights)
-    out[["use.target.index"]] <- TRUE
-  } #else{
-  #   out[["use.target.index"]] <- FALSE
-  # }
-
 
   if (inherits(X, "dgCMatrix") && ncol(X) > 1) {
-    sparse.data <- cbind(X, outcome, treatment, instrument, survival.numerator, survival.denominator, censor, sample.weights, target.weights)
+    sparse.data <- cbind(X, outcome, treatment, instrument, survival.numerator, survival.denominator, censor, sample.weights)
   } else {
     X <- as.matrix(X)
-    default.data <- as.matrix(cbind(X, outcome, treatment, instrument, survival.numerator, survival.denominator, censor, sample.weights, target.weights))
+    default.data <- as.matrix(cbind(X, outcome, treatment, instrument, survival.numerator, survival.denominator, censor, sample.weights))
   }
   out[["train.matrix"]] <- default.data
   out[["sparse.train.matrix"]] <- sparse.data

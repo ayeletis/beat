@@ -22,7 +22,9 @@
 #include <iterator>
 #include <stdexcept>
 #include <sstream>
-
+#include <Rcpp.h>
+#include <RcppEigen.h>
+#include <Eigen/Dense>
 #include "Data.h"
 
 namespace grf
@@ -34,7 +36,6 @@ namespace grf
                  treatment_index(),
                  instrument_index(),
                  weight_index(),
-                 target_index(),
                  causal_survival_numerator_index(),
                  causal_survival_denominator_index(),
                  censor_index() {}
@@ -192,12 +193,6 @@ namespace grf
     disallowed_split_variables.insert(index);
   }
 
-  void Data::set_target_index(const std::vector<size_t> &index)
-  {
-    this->target_index = index;
-    disallowed_split_variables.insert(index.begin(), index.end());
-  }
-
   void Data::set_causal_survival_numerator_index(size_t index)
   {
     this->causal_survival_numerator_index = index;
@@ -215,19 +210,48 @@ namespace grf
     this->censor_index = index;
     disallowed_split_variables.insert(index);
   }
-  void Data::set_target_avg_weight(std::vector<double> weights, const double target_weight_penalty)
+
+  // void Data::set_target_avg_weights(Rcpp::List target_avg_weights)
+  // {
+  //   this->target_avg_weights = target_avg_weights;
+  // }
+
+  void Data::set_target_avg_weights(Rcpp::List x)
   {
+    // Rcpp::Rcout << "Inside Setting weights done \n";
 
-
-    Eigen::VectorXf vect_weights(weights.size());
-    for (size_t i = 0; i < weights.size(); i++)
+    std::vector<Eigen::MatrixXd> out(x.size());
+    // Rcpp::Rcout << "matrix size: " << x.size() << "\n";
+    for (int i; i < x.size(); i++)
     {
-      vect_weights[i] = weights[i];
-    }
-    
-    this->target_avg_weights = vect_weights;
-    this->target_weight_penalty = target_weight_penalty;
+      // Rcpp::Rcout << "iteration: " << i << "\n";
 
+      Rcpp::NumericMatrix M = x[i];
+      // Rcpp::Rcout << "matrix rows: " << M.rows() << "\n";
+      Eigen::MatrixXd MS = Rcpp::as<Eigen::MatrixXd>(M);
+      // Rcpp::Rcout << "MS sum: " << MS.sum() << "\n";
+      // out[i] = Rcpp::as<Eigen::MatrixXf>(M);
+
+      // Eigen::MatrixXd MS(M.rows(), M.cols());
+
+      // for (double j; j < M.rows(); j++)
+      // {
+      //   for (double k; k < M.cols(); k++)
+      //   {
+      //     MS(j, k) = M(j, k);
+      //     // Rcpp::Rcout << "matrix value: " << MS(j, k) << "\n";
+      //     // Rcpp::Rcout << "count: " << j << "-" << k << "\n";
+      //   }
+      // }
+      out[i] = MS;
+      // Rcpp::Rcout << "out sum: " << out[i].sum() << "MS:" << MS.sum() << "\n";
+    }
+    this->target_avg_weights = out;
+  }
+
+  void Data::set_target_weight_penalty(double target_weight_penalty)
+  {
+    this->target_weight_penalty = target_weight_penalty;
   }
   void Data::get_all_values(std::vector<double> &all_values,
                             std::vector<size_t> &sorted_samples,
@@ -325,19 +349,6 @@ namespace grf
     }
   }
 
-  Eigen::VectorXf Data::get_target_avg_weights(size_t row) const
-  {
-    return target_avg_weights;
-  }
-  Eigen::VectorXf Data::get_target_weight(size_t row) const
-  {
-    Eigen::VectorXf out(target_index.value().size());
-    for (size_t i = 0; i < target_index.value().size(); i++)
-    {
-      out(i) = get(row, target_index.value()[i]);
-    }
-    return out;
-  }
   double Data::get_causal_survival_numerator(size_t row) const
   {
     return get(row, causal_survival_numerator_index.value());
@@ -357,5 +368,26 @@ namespace grf
   {
     return disallowed_split_variables;
   }
+
+  // Rcpp::NumericVector Data::get_target_avg_weights(size_t var, size_t row) const
+  // {
+  //   Rcpp::NumericMatrix  out = target_avg_weights[var];
+  //   return out.row(row);
+  // }
+
+  Eigen::MatrixXd Data::get_target_avg_weights(size_t var)
+  {
+    return target_avg_weights[var];
+  }
+
+  double Data::get_target_weight_penalty() const
+  {
+    return target_weight_penalty;
+  }
+  // size_t Data::get_target_weight_ncols() const
+  // {
+  //   Rcpp::NumericMatrix out = target_avg_weights[0];
+  //   return out.ncol();
+  // }
 
 } // namespace grf

@@ -34,11 +34,9 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
                         size_t outcome_index,
                         size_t treatment_index,
                         size_t sample_weight_index,
-                        std::vector<size_t> target_weights_index,
-                        std::vector<double> target_avg_weights,
+                        Rcpp::List target_avg_weights,
                         double target_weight_penalty,
                         bool use_sample_weights,
-                        bool use_target_index,
                         unsigned int mtry,
                         unsigned int num_trees,
                         unsigned int min_node_size,
@@ -55,33 +53,38 @@ Rcpp::List causal_train(Rcpp::NumericMatrix train_matrix,
                         unsigned int samples_per_cluster,
                         bool compute_oob_predictions,
                         unsigned int num_threads,
-                        unsigned int seed) {
+                        unsigned int seed)
+{
   ForestTrainer trainer = instrumental_trainer(reduced_form_weight, stabilize_splits);
 
   std::unique_ptr<Data> data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
+
   data->set_outcome_index(outcome_index);
   data->set_treatment_index(treatment_index);
   data->set_instrument_index(treatment_index);
-  if(use_sample_weights) {
-      data->set_weight_index(sample_weight_index);
+  if (use_sample_weights)
+  {
+    data->set_weight_index(sample_weight_index);
   }
+  // Rcpp::Rcout << "Setting weights \n";
+  data->set_target_avg_weights(target_avg_weights);
+  // Rcpp::Rcout << "Setting weights done \n";
 
-  data->set_target_index(target_weights_index);
-  data->set_target_avg_weight(target_avg_weights, target_weight_penalty);
+  data->set_target_weight_penalty(target_weight_penalty);
 
   ForestOptions options(num_trees, ci_group_size, sample_fraction, mtry, min_node_size, honesty,
                         honesty_fraction, honesty_prune_leaves, alpha, imbalance_penalty, num_threads, seed, clusters, samples_per_cluster);
   Forest forest = trainer.train(*data, options);
 
   std::vector<Prediction> predictions;
-  if (compute_oob_predictions) {
+  if (compute_oob_predictions)
+  {
     ForestPredictor predictor = instrumental_predictor(num_threads);
     predictions = predictor.predict_oob(forest, *data, false);
   }
 
   return RcppUtilities::create_forest_object(forest, predictions);
 }
-
 
 // [[Rcpp::export]]
 Rcpp::List causal_predict(Rcpp::List forest_object,
@@ -92,7 +95,8 @@ Rcpp::List causal_predict(Rcpp::List forest_object,
                           Rcpp::NumericMatrix test_matrix,
                           Eigen::SparseMatrix<double> sparse_test_matrix,
                           unsigned int num_threads,
-                          bool estimate_variance) {
+                          bool estimate_variance)
+{
   std::unique_ptr<Data> train_data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
   train_data->set_outcome_index(outcome_index);
   train_data->set_treatment_index(treatment_index);
@@ -115,7 +119,8 @@ Rcpp::List causal_predict_oob(Rcpp::List forest_object,
                               size_t outcome_index,
                               size_t treatment_index,
                               unsigned int num_threads,
-                              bool estimate_variance) {
+                              bool estimate_variance)
+{
   std::unique_ptr<Data> data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
   data->set_outcome_index(outcome_index);
   data->set_treatment_index(treatment_index);
@@ -142,7 +147,8 @@ Rcpp::List ll_causal_predict(Rcpp::List forest_object,
                              bool ll_weight_penalty,
                              std::vector<size_t> linear_correction_variables,
                              unsigned int num_threads,
-                             bool estimate_variance) {
+                             bool estimate_variance)
+{
   std::unique_ptr<Data> train_data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
   train_data->set_outcome_index(outcome_index);
   train_data->set_treatment_index(treatment_index);
@@ -169,7 +175,8 @@ Rcpp::List ll_causal_predict_oob(Rcpp::List forest_object,
                                  bool ll_weight_penalty,
                                  std::vector<size_t> linear_correction_variables,
                                  unsigned int num_threads,
-                                 bool estimate_variance) {
+                                 bool estimate_variance)
+{
   std::unique_ptr<Data> data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
 
   data->set_outcome_index(outcome_index);

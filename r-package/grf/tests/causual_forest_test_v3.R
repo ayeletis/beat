@@ -1,8 +1,35 @@
-
+rm(list = ls())
 # install.packages("grf")
 library(grf)
+#
+construct_target_weight_mean = function(x, z, num_breaks = 256) {
+  calculate_avg = function(dat, x_col, z_col, num_breaks) {
+    df = dat[, .SD, .SDcols = c(x_col, z_col)]
+    df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
 
+    df[, mean_value := mean(get(z_col)), by = cut_bins]
+    # out = df[, mean_value] # if z is orthogonal (z hat)
+    out = df[, mean_value - mean(mean_value)] # if they are independent, then error will center around 0
+    return(out)
+  }
 
+  stopifnot(is.matrix(z))
+  stopifnot(dim(x)[1] == dim(z)[1])
+  dat = as.data.table(x)
+  x_cols = paste0('x_', 1:dim(x)[2])
+  names(dat) = x_cols
+  dat_z = as.data.table(z)
+  z_cols = paste0("z_", 1:dim(z)[2])
+  names(dat_z) = z_cols
+  dat = cbind(dat, dat_z)
+  # output matrix: 3D [var, n, z]
+  out = vector('list', length = length(x_cols))
+  for (i in 1:length(x_cols)) {
+    out[[i]] = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
+  }
+
+  return(out)
+}
 
 library(ggplot2)
 library(data.table)
@@ -11,7 +38,7 @@ library(gridExtra)
 library(dplyr)
 
 # Empty workspace
-rm(list = ls())
+
 
 sigmoid <- function(x) {
   return(1 / (1 + exp(-x)))
@@ -20,10 +47,10 @@ relu <- function(x) {
   return(ifelse(x > 0, x, 0))
 }
 
-n1 <- 1000
+n1 <- 5000
 # calibration
 n2 <- 1000
-num_trees <- 4000
+num_trees <-  4000
 # validation
 p_continuous <- 4
 p_discrete <- 1
@@ -42,7 +69,7 @@ X_disc <- matrix(rbinom(n * p_discrete, 1, 0.3), n, p_discrete)
 # Z = as.matrix(rbinom(n, 1, 1/(1+exp(-X_cont[,2]))))
 
 ## Higher dimension for demographics -- 1 of them related to X_cont[,2], two other binary and a continuous, all independent
-Z <- sapply(1:1, function(x) as.matrix(rbinom(n, 1, 1 / (1 + exp(-X_cont[, 2])))))
+Z <- sapply(1:1, function(x) as.matrix(rbinom(n, 1, 1 / (1 + exp(-X_cont[, 2]*10)))))
 Z <- cbind(Z, rbinom(n, 1, 0.2), rbinom(n, 1, 0.7), rnorm(n, 0, 1))
 
 # print(c("validity_check for X,Z dependency",mean(X_cont[Z[,1]==0,2]),mean(X_cont[Z[,1]==1,2])))
@@ -96,21 +123,23 @@ if (FALSE) {
 ##   Estimate 'tau' using GRF
 ## ---------------------------------------------------
 
-
+# target.weights = construct_target_weight_mean(X_train, as.matrix(Z_train), num_breaks = 256)
 fit_grf <- causal_forest(X_train, Y_train, W_train,
                          honesty = TRUE,
-                         target.weight.penalty=1,
+                         #Y.hat = 0, W.hat=0,
+                         target.weights = as.matrix(Z_train) ,
+                         target.weight.penalty=0,
                          num.trees = num_trees,
-                         # num.threads=1
+                         # num.threads=1,
                          # tune.parameters='all'
                          seed=1
 )
-fit_grf$tuning.output
 
 
 fit_grf_v2 <- causal_forest(X_train, Y_train, W_train,
                             target.weights = as.matrix(Z_train),
-                            target.weight.penalty =10,
+                            target.weight.penalty = 10,
+                            target.weight.bins.breaks = 128,
                             honesty = TRUE,
                             num.trees = num_trees, #10, #num_trees,
                             # tune.parameters = "all",
@@ -118,7 +147,7 @@ fit_grf_v2 <- causal_forest(X_train, Y_train, W_train,
                             seed=1
 )
 
-fit_grf_v2$tuning.output
+
 
 tau_train.grf <- predict(fit_grf, estimate.variance = TRUE) # newdata=X_validate,
 tau.pred <- tau_train.grf$predictions
@@ -142,20 +171,76 @@ ggdensity(
   scales = "free_y"
 )
 
-library(ggpubr)
-x = runif(1000)
-x = seq(0.0001, 1,0.01)
-y = pmin(gamma(x), 100)
-d = data.table(x,y)
-gghistogram(d,'y', xlim=c(0, 100), binwidth = 1)
-ggline(d,'x','y', numeric.x.axis = TRUE, plot_type = 'l') + labs(title='Target Weight Penalty',
-                                                subtitle='Gamma Distribution; Cap to 100')
-ggsave("gamma.png", width=6, height=4)
-# ================================================================
-#
-# ----------------------------------------------------------------
-# propensity scores
-forest.W <- regression_forest(X_train, W_train, tune.parameters = "all")
+
+
+## -------------------------------------------
+## Generate Marginals (moderating effects)
+## -------------------------------------------
+
+generate_prediction_per_dim= function(x_dim) {
+  if(x_dim<5){
+    x <- seq(-2, 2, length.out = 101)
+    X.marginals <- matrix(0, 101, p)
+  }else if (x_dim==5){
+    x <- c(0, 1)
+    X.marginals <- matrix(0, 2, p)
+  }
+  X.marginals[, x_dim] <- x
+  X.marginals <- as.data.table(X.marginals)
+
+  tau.hat <- predict(fit_grf, X.marginals, estimate.variance = TRUE)
+  sigma.hat <- sqrt(tau.hat$variance.estimates)
+
+  tau.weight.hat <- predict(fit_grf_v2, X.marginals, estimate.variance = TRUE)
+  sigma.weight.hat <- sqrt(tau.weight.hat$variance.estimates)
+
+  # out = data.table(x=x, x_dim=x_dim)
+  # out[, tau.true :=tau_function(X.marginals)]
+
+  out.no.weight = data.table(
+    x = x, x_dim = x_dim,tau.true = tau_function(as.matrix(X.marginals)),
+    tau.pred = tau.hat$predictions,
+    tau.pred.upper=  tau.hat$predictions + 1.96 * sigma.hat,
+    tau.pred.lower =  tau.hat$predictions - 1.96 * sigma.hat,
+    tau.type = 'no weight'
+  )
+  out.with.weight = data.table(
+    x = x, x_dim = x_dim, tau.true = tau_function(as.matrix(X.marginals)),
+    tau.pred = tau.weight.hat$predictions,
+    tau.pred.upper=  tau.weight.hat$predictions + 1.96 * sigma.weight.hat,
+    tau.pred.lower =  tau.weight.hat$predictions - 1.96 * sigma.weight.hat,
+    tau.type = 'with weight'
+  )
+  out = rbindlist(list(out.no.weight,out.with.weight))
+  return(out)
+}
+
+dat_pred <- rbindlist(lapply(1:p, generate_prediction_per_dim))
+
+ggline(dat_pred, x='x',
+       y='tau.pred',
+       short.panel.labs = FALSE,
+       facet.by = 'x_dim',
+       scale='free_y',
+       color='tau.type',numeric.x.axis = TRUE) +
+  geom_line(mapping = aes(x = x, y = tau.true), color = "purple") +
+  geom_line(mapping = aes(x = x, y = tau.pred.upper, color = tau.type), linetype='dashed') +
+  geom_line(mapping = aes(x = x, y = tau.pred.lower, color = tau.type), linetype='dashed')
+
+
+## ---------------------------------------------------------
+##   Explore the possible bias and whether new GRF got rid of it
+## ---------------------------------------------------------
+
+get_ecdf_values <- function(x) {
+  v <- seq(0, 1, 0.01)
+  return(list(v, ecdf(x)(v)))
+}
+
+# ggsave("result_with_z_50_correlation.png", width = 8, height=6)
+
+## Hengyu, in the plot above, I want to have the x-axis fixed (to compare values) and the y-axis free, how can i do that?
+
 W.hat <- predict(forest.W)$predictions
 
 # Y_hat, for GRF

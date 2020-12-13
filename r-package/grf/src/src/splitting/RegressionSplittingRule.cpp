@@ -30,7 +30,6 @@ namespace grf
         this->counter = new size_t[max_num_unique_values];
         this->sums = new double[max_num_unique_values];
         this->weight_sums = new double[max_num_unique_values];
-        this->target_left_weights = new double[max_num_unique_values];
     }
 
     RegressionSplittingRule::~RegressionSplittingRule()
@@ -46,10 +45,6 @@ namespace grf
         if (weight_sums != nullptr)
         {
             delete[] weight_sums;
-        }
-        if (target_left_weights != nullptr)
-        {
-            delete[] target_left_weights;
         }
     }
 
@@ -130,29 +125,10 @@ namespace grf
         std::fill(weight_sums, weight_sums + num_splits, 0);
         std::fill(counter, counter + num_splits, 0);
         std::fill(sums, sums + num_splits, 0);
-        std::fill(target_left_weights, target_left_weights + num_splits, 0);
 
         size_t n_missing = 0;
         double weight_sum_missing = 0;
         double sum_missing = 0;
-
-        // target weights
-        double target_weight_penalty = data.target_weight_penalty;
-        Eigen::VectorXf target_avg_weight = data.target_avg_weights;
-        Eigen::MatrixXf target_weights_matrix(size_node, data.get_target_weight(1).size());
-
-        for (size_t i = 0; i < size_node; i++)
-        {
-            target_weights_matrix.row(i) = data.get_target_weight(sorted_samples[i]);
-        }
-
-        // Eigen::VectorXf target_avg_weight = data.get_target_avg_weights(1); // mean per target column
-        float target_l2_norm = target_avg_weight.lpNorm<2>();
-
-        // std::cout << "regression target_avg_weight: " << target_avg_weight[0] << "\n" << std::flush;
-        // std::cout << "target_weights_matrix top 3" << std::endl << target_weights_matrix.topRows(2) << std::endl;
-        // std::cout << "target_weight \n" << target_weight << std::endl;
-        // target left node
 
         // Fill counter and sums buckets
         // used to store each split
@@ -176,18 +152,6 @@ namespace grf
                 weight_sums[split_index] += sample_weight;
                 sums[split_index] += sample_weight * response;
                 ++counter[split_index];
-                Eigen::VectorXf sample_target_left = target_weights_matrix.topRows(i).colwise().mean();
-                Eigen::VectorXf sample_target_right = target_weights_matrix.bottomRows(size_node - i).colwise().mean();
-
-                target_left_weights[split_index] =  (target_avg_weight - sample_target_left).lpNorm<2>() / (target_l2_norm + sample_target_left.lpNorm<2>()) ;
-                                                    // (size_node - i) * (target_avg_weight - sample_target_right).lpNorm<2>() / (target_l2_norm + sample_target_right.lpNorm<2>());
-
-                //  +
-                //
-
-                // std::cout <<'target_avg_weight'<< target_avg_weight << std::flush;
-                // std::cout <<'sample_target_left'<< sample_target_left << std::flush;
-                // std::cout << "target_left_weights:" <<  target_left_weights[split_index] << std::flush;
             }
 
             double next_sample_value = data.get(next_sample, var);
@@ -232,7 +196,7 @@ namespace grf
                 n_left += counter[i];
                 weight_sum_left += weight_sums[i];
                 sum_left += sums[i];
-                double panelty_target_weight = target_left_weights[i];
+                // double panelty_target_weight = target_left_weights[i];
 
                 // Skip this split if one child is too small.
                 if (n_left < min_child_size)
@@ -254,19 +218,8 @@ namespace grf
                 // Penalize splits that are too close to the edges of the data.
                 double penalty = imbalance_penalty * (1.0 / n_left + 1.0 / n_right);
                 decrease -= penalty;
-                // target weight penalty
-                // std::cout << "left matrix:" << sample_target_weights_left_matrix.row(i) << "\n";
-
-                //  std::cout <<"Decrease:" << decrease << " Regression target weight:"<< panelty_target_weight<< std::flush << "\n";
-                // std::cout << "regression target weight panelty:" << panelty_target_weight << "\n"  ;
-                // decrease -= decrease * panelty_target_weight * target_weight_penalty; //decrease *
-                // If better than before, use this
-
-                // if (decrease < 0)
-                // {
-                //     std::cout << "regression panelty_target_weight:" << panelty_target_weight << "\n";
-                //     throw std::invalid_argument("regression");
-                // }
+              
+              
                 if (decrease > best_decrease)
                 {
 
