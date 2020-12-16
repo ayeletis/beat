@@ -5,7 +5,6 @@
 #
 # To prepare a CRAN build:
 #   `Rscript build_package.R --as-cran`
-
 args <- commandArgs(TRUE)
 library(Rcpp)
 library(devtools)
@@ -30,10 +29,8 @@ roxygen2::roxygenise(package.name)
 compileAttributes(package.name)
 clean_dll(package.name)
 build(package.name)
+install.packages("grf_1.2.1.tar.gz", repos=NULL, type="source", 
+                 clean = TRUE, Ncpus=parallel::detectCores(),
+                 verbose=TRUE,INSTALL_opts = c('--no-lock')
+                 )
 
-# Test installation and run some smoke tests.
-install(package.name)
-library(package.name, character.only = TRUE)
-# Treat warnings as errors.
-options(warn = 2)
-test_package(package.name)

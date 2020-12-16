@@ -7,3 +7,6 @@ test/*
 releases/*
 *.idea
 *.dll
+*.Rd
+*.rd
+*.Rd

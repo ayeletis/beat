@@ -7,7 +7,7 @@
 *.lo
 *.o
 *.obj
-
+*.Rd
 # clion files
 .idea/
 .settings/*
