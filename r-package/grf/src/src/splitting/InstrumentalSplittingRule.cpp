@@ -194,6 +194,7 @@ namespace grf
       {
         target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
       }
+     
     }
     // std::cout << "var: " << var << "; penalty:" << target_weight_penalty << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
 

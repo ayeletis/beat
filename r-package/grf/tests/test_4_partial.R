@@ -121,16 +121,20 @@ if (FALSE) {
 ##   Estimate 'tau' using GRF
 ## ---------------------------------------------------
 
-# target.weights = construct_target_weight_mean(X_train, as.matrix(Z_train), num_breaks = 256)
+
+# X_hat = regression_forest(X = as.matrix(Z_train), Y = as.matrix(X_train[, 1]), num.trees = num_trees, seed=1,
+                          # tune.parameters = 'all')
+# X_org = X_train - predict(X_hat)$prediction
+
 time1 = Sys.time()
 fit_grf <- causal_forest(X_train, Y_train, W_train,
                          honesty = TRUE,
                          #Y.hat = 0, W.hat=0,
-                         target.weights = as.matrix(Z_train) ,
+                         #target.weights = as.matrix(Z_train) ,
                          target.weight.penalty=0,
                          num.trees = num_trees,
                          # num.threads=1,
-                         # tune.parameters='all'
+                         tune.parameters='all',
                          seed=1
 )
 print(Sys.time() - time1)
@@ -138,17 +142,19 @@ print(Sys.time() - time1)
 time1 = Sys.time()
 fit_grf_v2 <- causal_forest(X_train, Y_train, W_train,
                             target.weights = as.matrix(Z_train),
-                            target.weight.penalty = 10,
-                            target.weight.demean = TRUE,
+                            target.weight.penalty = 0,
+                            target.weight.standardize = TRUE,
                             # target.weights.hat = 0,
                             target.weight.bins.breaks = 256,
                             honesty = TRUE,
                             num.trees = num_trees, #10, #num_trees,
-                            # tune.parameters = "all",
+                            tune.parameters = "all",
                             # num.threads = 1,
                             seed=1
 )
 print(Sys.time() - time1)
+
+
 
 tau_train.grf <- predict(fit_grf, estimate.variance = TRUE) # newdata=X_validate,
 tau.pred <- tau_train.grf$predictions
@@ -190,7 +196,7 @@ generate_prediction_per_dim= function(x_dim) {
   }
   X.marginals[, x_dim] <- x
   X.marginals <- as.data.table(X.marginals)
-
+  # X.marginals.hat = predict(X_hat, newdata=X.marginals)$prediction
   tau.hat <- predict(fit_grf, X.marginals, estimate.variance = TRUE)
   sigma.hat <- sqrt(tau.hat$variance.estimates)
 

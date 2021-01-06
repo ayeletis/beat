@@ -34,6 +34,8 @@ Rcpp::List regression_train(Rcpp::NumericMatrix train_matrix,
                             size_t outcome_index,
                             size_t sample_weight_index,
                             bool use_sample_weights,
+                            Rcpp::List target_avg_weights, // not used yet
+                            double target_weight_penalty,
                             unsigned int mtry,
                             unsigned int num_trees,
                             unsigned int min_node_size,

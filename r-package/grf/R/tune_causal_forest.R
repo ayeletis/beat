@@ -108,7 +108,6 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               tune.num.draws = 1000,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max),
-                              target.weights= NULL,
                               target.avg.weights=NULL,
                               target.weight.penalty=0) {
   validate_X(X, allow.na = TRUE)
@@ -122,6 +121,10 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
 
+  if( is.null(target.avg.weights) || max(sapply(target.avg.weights, function(x) max(abs(x))))  == 0  ){
+    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
+  }
+
   default.parameters <- list(sample.fraction = 0.5,
                              mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
                              min.node.size = 5,
@@ -129,7 +132,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                              honesty.prune.leaves = TRUE,
                              alpha = 0.05,
                              imbalance.penalty = 0,
-                             target.weight.penalty=1)
+                             target.weight.penalty=0)
 
   userinput.parameters <- list(
                             sample.fraction = sample.fraction,
@@ -143,8 +146,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
 
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
-  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
-                              sample.weights = sample.weights, target.weights=target.weights)
+  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered, sample.weights = sample.weights)
   nrow.X <- nrow(X)
   ncol.X <- ncol(X)
   args <- list(clusters = clusters,
@@ -162,7 +164,6 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                num.threads = num.threads,
                seed = seed,
                reduced.form.weight = 0,
-               #target.weights=target.weights,
                target.avg.weights=target.avg.weights,
                target.weight.penalty=target.weight.penalty)
 

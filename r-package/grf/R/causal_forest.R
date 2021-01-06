@@ -145,10 +145,9 @@ causal_forest <- function(X,
                           num.trees = 2000,
                           sample.weights = NULL,
                           target.weights = NULL,
-                          target.weights.hat = NULL,
-                          target.weight.penalty = NULL,
+                          target.weight.penalty = 0,
                           target.weight.bins.breaks = 256,
-                          target.weight.demean = FALSE,
+                          target.weight.standardize = TRUE,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -175,11 +174,22 @@ causal_forest <- function(X,
   Y <- validate_observations(Y, X)
   W <- validate_observations(W, X)
 
+
   # target weight
-  if (is.null(target.weights) | isFALSE(target.weights)) {
-    target.weights <- as.matrix(replicate(NROW(X), 0))
-    # stop()
+  if(!is.null(target.weights)){
+    stopifnot(dim(target.weights)[1] == dim(X)[1])
+    if(isTRUE(target.weight.standardize)  ){
+      target.weights = apply(target.weights, 2, standardize) # per column
+    }
+
+  }else{
+    target.weights = as.matrix(replicate(NROW(X), 0))
   }
+
+  #output list : [num x feture] [[num rows, num target weight feature]]
+  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
+                                                    num_breaks = target.weight.bins.breaks)
+  ##
 
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <-
@@ -196,6 +206,12 @@ causal_forest <- function(X,
     "imbalance.penalty",
     "target.weight.penalty"
   )
+
+  if(max(abs(target.weights)) == 0){
+    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
+  }
+
+
 
   args.orthog <- list(
     X = X,
@@ -271,17 +287,14 @@ causal_forest <- function(X,
 
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
-  target.weights.centered =  target.weights #- target.weights.hat #
 
-  # output list : [num x feture] [[num rows, num target weight feature]]
-  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights.centered,
-                                                    num_breaks = target.weight.bins.breaks,
-                                                    demean=target.weight.demean)
+
   data <- create_train_matrices(
     X,
     outcome = Y.centered,
     treatment = W.centered,
     sample.weights = sample.weights)
+
   args <- list(
     num.trees = num.trees,
     target.avg.weights = target.avg.weights,
@@ -505,19 +518,28 @@ predict.causal_forest <- function(object,
   do.call(cbind.data.frame, ret[!empty])
 }
 
-
-construct_target_weight_mean = function(x, z, num_breaks = 256, demean=TRUE) {
+standardize = function(x){
+  if(length(unique(x))==1){
+    return( scale(x, center=TRUE, scale=FALSE))
+  }else{
+    return(scale(x, center=TRUE, scale=TRUE))
+  }
+}
+construct_target_weight_mean = function(x, z, num_breaks = 256) {
   calculate_avg = function(dat, x_col, z_col, num_breaks) {
     df = dat[, .SD, .SDcols = c(x_col, z_col)]
     df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
-
+    # if(isTRUE(demean)){
+    #   df[, (z_col) := get(z_col) - mean(get(z_col))]
+    # }
     df[, mean_value := mean(get(z_col)), by = cut_bins]
+    out = df[, mean_value]
     # out = df[, mean_value] # if z is orthogonal (z hat)
-    if(isTRUE(demean)){
-      out = df[, mean_value - mean(mean_value)]
-    }else{
-      out = df[, mean_value]
-    }
+    # if(isTRUE(demean)){
+    #   out = df[, mean_value - mean(mean_value)]
+    # }else{
+    #   out = df[, mean_value]
+    # }
     return(out)
   }
 
