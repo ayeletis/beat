@@ -21,7 +21,7 @@
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
-#' @param sample.weights (experimental) Weights given to each observation in estimation.
+#' @param sample.weights Weights given to each observation in estimation.
 #'                       If NULL, each observation receives equal weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
 #'  Default is NULL (ignored).
@@ -79,6 +79,24 @@
 #' @param seed The seed of the C++ random number generator.
 #'
 #' @return A trained instrumental forest object.
+#'
+#' @examples
+#' \donttest{
+#' # Train an instrumental forest.
+#' n <- 2000
+#' p <- 5
+#' X <- matrix(rbinom(n * p, 1, 0.5), n, p)
+#' Z <- rbinom(n, 1, 0.5)
+#' Q <- rbinom(n, 1, 0.5)
+#' W <- Q * Z
+#' tau <-  X[, 1] / 2
+#' Y <- rowSums(X[, 1:3]) + tau * W + Q + rnorm(n)
+#' iv.forest <- instrumental_forest(X, Y, W, Z)
+#'
+#' # Predict on out-of-bag training samples.
+#' iv.pred <- predict(iv.forest)
+#' }
+#'
 #' @export
 instrumental_forest <- function(X, Y, W, Z,
                                 Y.hat = NULL,
@@ -250,6 +268,23 @@ instrumental_forest <- function(X, Y, W, Z,
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @return Vector of predictions, along with (optional) variance estimates.
+#'
+#' @examples
+#' \donttest{
+#' # Train an instrumental forest.
+#' n <- 2000
+#' p <- 5
+#' X <- matrix(rbinom(n * p, 1, 0.5), n, p)
+#' Z <- rbinom(n, 1, 0.5)
+#' Q <- rbinom(n, 1, 0.5)
+#' W <- Q * Z
+#' tau <-  X[, 1] / 2
+#' Y <- rowSums(X[, 1:3]) + tau * W + Q + rnorm(n)
+#' iv.forest <- instrumental_forest(X, Y, W, Z)
+#'
+#' # Predict on out-of-bag training samples.
+#' iv.pred <- predict(iv.forest)
+#' }
 #'
 #' @method predict instrumental_forest
 #' @export

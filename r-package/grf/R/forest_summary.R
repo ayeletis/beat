@@ -12,10 +12,23 @@
 #' no heterogeneity.
 #'
 #' @param forest The trained forest.
+#' @param vcov.type Optional covariance type for standard errors. The possible
+#'  options are HC0, ..., HC3. The default is "HC3", which is recommended in small
+#'  samples and corresponds to the "shortcut formula" for the jackknife
+#'  (see MacKinnon & White for more discussion, and Cameron & Miller for a review).
+#'  For large data sets with clusters, "HC0" or "HC1" are significantly faster to compute.
 #' @return A heteroskedasticity-consistent test of calibration.
+#'
+#' @references Cameron, A. Colin, and Douglas L. Miller. "A practitioner's guide to
+#'  cluster-robust inference." Journal of human resources 50, no. 2 (2015): 317-372.
+#'
 #' @references Chernozhukov, Victor, Mert Demirer, Esther Duflo, and Ivan Fernandez-Val.
 #'             "Generic Machine Learning Inference on Heterogenous Treatment Effects in
 #'             Randomized Experiments." arXiv preprint arXiv:1712.04802 (2017).
+#'
+#' @references MacKinnon, James G., and Halbert White. "Some heteroskedasticity-consistent
+#'  covariance matrix estimators with improved finite sample properties."
+#'  Journal of Econometrics 29.3 (1985): 305-325.
 #'
 #' @examples
 #' \donttest{
@@ -29,7 +42,7 @@
 #' }
 #'
 #' @export
-test_calibration <- function(forest) {
+test_calibration <- function(forest, vcov.type = "HC3") {
   observation.weight <- observation_weights(forest)
   clusters <- if (length(forest$clusters) > 0) {
     forest$clusters
@@ -64,14 +77,14 @@ test_calibration <- function(forest) {
     )
   blp.summary <- lmtest::coeftest(best.linear.predictor,
     vcov = sandwich::vcovCL,
-    type = "HC3",
+    type = vcov.type,
     cluster = clusters
   )
   attr(blp.summary, "method") <-
-    paste("Best linear fit using forest predictions (on held-out data)",
-      "as well as the mean forest prediction as regressors, along",
-      "with one-sided heteroskedasticity-robust (HC3) SEs",
-      sep = "\n"
+    paste0("Best linear fit using forest predictions (on held-out data)\n",
+      "as well as the mean forest prediction as regressors, along\n",
+      "with one-sided heteroskedasticity-robust ",
+      "(", vcov.type, ") SEs"
     )
   # convert to one-sided p-values
   dimnames(blp.summary)[[2]][4] <- gsub("[|]", "", dimnames(blp.summary)[[2]][4])
@@ -82,14 +95,12 @@ test_calibration <- function(forest) {
 
 
 #' Estimate the best linear projection of a conditional average treatment effect
-#' using a causal forest.
+#' using a causal forest, or causal survival forest.
 #'
 #' Let tau(Xi) = E[Y(1) - Y(0) | X = Xi] be the CATE, and Ai be a vector of user-provided
-#' covariates. This function provides a (doubly robust) fit to the linear model
+#' covariates. This function provides a (doubly robust) fit to the linear model tau(Xi) ~ beta_0 + Ai * beta.
 #'
-#' tau(Xi) ~ beta_0 + Ai * beta
-#'
-#' Procedurally, we do so by regressing doubly robust scores derived from the causal
+#' Procedurally, we do so by regressing doubly robust scores derived from the
 #' forest against the Ai. Note the covariates Ai may consist of a subset of the Xi,
 #' or they may be distinct The case of the null model tau(Xi) ~ beta_0 is equivalent
 #' to fitting an average treatment effect via AIPW.
@@ -105,16 +116,30 @@ test_calibration <- function(forest) {
 #'               estimate the ATE. WARNING: For valid statistical performance,
 #'               the subset should be defined only using features Xi, not using
 #'               the treatment Wi or the outcome Yi.
-#' @param debiasing.weights A vector of length n (or the subset length) of debiasing weights. If NULL (default)
-#'                          and the treatment is binary, then inverse-propensity weighting is used,
-#'                          otherwise, if the treatment is continuous, these are estimated by a variance
-#'                          forest.
-#' @param num.trees.for.variance Number of trees used to estimate Var[Wi | Xi = x]. Default is 500.
-#'                               (only applies with continuous treatment and debiasing.weights = NULL)
+#' @param debiasing.weights A vector of length n (or the subset length) of debiasing weights.
+#'               If NULL (default) these are obtained via the appropriate doubly robust score
+#'               construction, e.g., in the case of causal_forests with a binary treatment, they
+#'               are obtained via inverse-propensity weighting.
+#' @param num.trees.for.weights In some cases (e.g., with causal forests with a continuous
+#'               treatment), we need to train auxiliary forests to learn debiasing weights.
+#'               This is the number of trees used for this task. Note: this argument is only
+#'               used when debiasing.weights = NULL.
+#' @param vcov.type Optional covariance type for standard errors. The possible
+#'  options are HC0, ..., HC3. The default is "HC3", which is recommended in small
+#'  samples and corresponds to the "shortcut formula" for the jackknife
+#'  (see MacKinnon & White for more discussion, and Cameron & Miller for a review).
+#'  For large data sets with clusters, "HC0" or "HC1" are significantly faster to compute.
+#'
+#' @references Cameron, A. Colin, and Douglas L. Miller. "A practitioner's guide to
+#'  cluster-robust inference." Journal of human resources 50, no. 2 (2015): 317-372.
 #'
 #' @references Chernozhukov, Victor, and Vira Semenova. "Simultaneous inference for
 #'             Best Linear Predictor of the Conditional Average Treatment Effect and
 #'             other structural functions." arXiv preprint arXiv:1702.06240 (2017).
+#'
+#' @references MacKinnon, James G., and Halbert White. "Some heteroskedasticity-consistent
+#'  covariance matrix estimators with improved finite sample properties."
+#'  Journal of Econometrics 29.3 (1985): 305-325.
 #'
 #' @examples
 #' \donttest{
@@ -129,62 +154,41 @@ test_calibration <- function(forest) {
 #'
 #' @return An estimate of the best linear projection, along with coefficient standard errors.
 #'
-#' @importFrom stats lm
-#'
 #' @export
 best_linear_projection <- function(forest,
                                    A = NULL,
                                    subset = NULL,
                                    debiasing.weights = NULL,
-                                   num.trees.for.variance = 500) {
-  if (!("causal_forest" %in% class(forest))) {
-    stop("`best_linear_projection` is only implemented for `causal_forest`")
-  }
-
-  if (is.null(subset)) {
-    subset <- 1:length(forest$Y.hat)
-  }
-
-  if (class(subset) == "logical" && length(subset) == length(forest$Y.hat)) {
-    subset <- which(subset)
-  }
-
-  if (!all(subset %in% 1:length(forest$Y.hat))) {
-    stop(paste(
-      "If specified, subset must be a vector contained in 1:n,",
-      "or a boolean vector of length n."
-    ))
-  }
-
-  cluster.se <- length(forest$clusters) > 0
-
-  clusters <- if (cluster.se) {
+                                   num.trees.for.weights = 500,
+                                   vcov.type = "HC3") {
+  clusters <- if (length(forest$clusters) > 0) {
     forest$clusters
   } else {
     1:length(forest$Y.orig)
   }
   observation.weight <- observation_weights(forest)
 
-  # Only use data selected via subsetting.
-  subset.X.orig <- forest$X.orig[subset, , drop = FALSE]
-  subset.W.orig <- forest$W.orig[subset]
-  subset.W.hat <- forest$W.hat[subset]
-  subset.Y.orig <- forest$Y.orig[subset]
-  subset.Y.hat <- forest$Y.hat[subset]
-  tau.hat.pointwise <- predict(forest)$predictions[subset]
+  subset <- validate_subset(forest, subset)
   subset.clusters <- clusters[subset]
-  subset.weights.raw <- observation.weight[subset]
-  subset.weights <- subset.weights.raw / mean(subset.weights.raw)
+  subset.weights <- observation.weight[subset]
 
   if (length(unique(subset.clusters)) <= 1) {
     stop("The specified subset must contain units from more than one cluster.")
   }
 
-  binary.W <- all(subset.W.orig %in% c(0, 1))
+  if (!is.null(debiasing.weights)) {
+    if (length(debiasing.weights) == length(forest$Y.orig)) {
+      debiasing.weights <- debiasing.weights[subset]
+    } else if (length(debiasing.weights) != length(subset)) {
+      stop("If specified, debiasing.weights must be a vector of length n or the subset length.")
+    }
+  }
+
+  binary.W <- all(forest$W.orig %in% c(0, 1))
 
   if (binary.W) {
-    if (min(subset.W.hat) <= 0.01 && max(subset.W.hat) >= 0.99) {
-      rng <- range(subset.W.hat)
+    if (min(forest$W.hat[subset]) <= 0.01 && max(forest$W.hat[subset]) >= 0.99) {
+      rng <- range(forest$W.hat[subset])
       warning(paste0(
         "Estimated treatment propensities take values between ",
         round(rng[1], 3), " and ", round(rng[2], 3),
@@ -193,35 +197,12 @@ best_linear_projection <- function(forest,
     }
   }
 
-  if (!is.null(debiasing.weights)) {
-    if (length(debiasing.weights) == length(forest$Y.orig)) {
-      weights <- debiasing.weights[subset]
-    } else if (length(debiasing.weights) != length(subset)) {
-      stop("If specified, debiasing.weights must be a vector of length n or the subset length.")
-    } else {
-      weights <- debiasing.weights
-    }
-  } else if (binary.W) {
-    IPW <- (subset.W.orig - subset.W.hat) / (subset.W.hat * (1 - subset.W.hat))
-    weights <- IPW
+  if (any(c("causal_forest", "causal_survival_forest") %in% class(forest))) {
+    DR.scores <- get_scores(forest, subset = subset, debiasing.weights = debiasing.weights,
+                            num.trees.for.weights = num.trees.for.weights)
   } else {
-    # If treatment is continuous, estimate the variance of W given X
-    # Details: https://github.com/grf-labs/grf/issues/608#issuecomment-582747602
-    variance.forest <- regression_forest(subset.X.orig,
-                                        (subset.W.orig - subset.W.hat)^2,
-                                        clusters = subset.clusters,
-                                        num.trees = num.trees.for.variance,
-                                        ci.group.size = 1)
-    V.hat <- predict(variance.forest)$predictions
-    debiasing.weights <- subset.weights * (subset.W.orig - subset.W.hat) / V.hat
-    weights <- debiasing.weights
+    stop("`best_linear_projection` is only implemented for `causal_forest` and `causal_survival_forest`")
   }
-
-  # Compute doubly robust scores
-  mu.w.hat <- subset.Y.hat + (subset.W.orig - subset.W.hat) * tau.hat.pointwise
-  mu.w.hat.residual <- subset.Y.orig - mu.w.hat
-  correction <- weights * mu.w.hat.residual
-  Gamma.hat <- tau.hat.pointwise + correction
 
   if (!is.null(A)) {
     A <- as.matrix(A)
@@ -235,21 +216,21 @@ best_linear_projection <- function(forest,
     if (is.null(colnames(A.subset))) {
       colnames(A.subset) <- paste0("A", 1:ncol(A))
     }
-    DF <- data.frame(target = Gamma.hat, A.subset)
+    DF <- data.frame(target = DR.scores, A.subset)
   } else {
-    DF <- data.frame(target = Gamma.hat)
+    DF <- data.frame(target = DR.scores)
   }
 
   blp.ols <- lm(target ~ ., weights = subset.weights, data = DF)
   blp.summary <- lmtest::coeftest(blp.ols,
                                   vcov = sandwich::vcovCL,
-                                  type = "HC3",
+                                  type = vcov.type,
                                   cluster = subset.clusters
   )
   attr(blp.summary, "method") <-
-    paste("Best linear projection of the conditional average treatment effect.",
-          "Confidence intervals are cluster- and heteroskedasticity-robust (HC3)",
-          sep="\n")
+    paste0("Best linear projection of the conditional average treatment effect.\n",
+          "Confidence intervals are cluster- and heteroskedasticity-robust ",
+          "(", vcov.type, ")")
 
   blp.summary
 }

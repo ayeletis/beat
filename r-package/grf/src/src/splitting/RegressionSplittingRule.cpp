@@ -46,7 +46,7 @@ RegressionSplittingRule::~RegressionSplittingRule() {
 bool RegressionSplittingRule::find_best_split(const Data& data,
                                               size_t node,
                                               const std::vector<size_t>& possible_split_vars,
-                                              const std::vector<double>& responses_by_sample,
+                                              const Eigen::ArrayXXd& responses_by_sample,
                                               const std::vector<std::vector<size_t>>& samples,
                                               std::vector<size_t>& split_vars,
                                               std::vector<double>& split_values,
@@ -61,7 +61,7 @@ bool RegressionSplittingRule::find_best_split(const Data& data,
   for (auto& sample : samples[node]) {
     double sample_weight = data.get_weight(sample);
     weight_sum_node += sample_weight;
-    sum_node += sample_weight * responses_by_sample[sample];
+    sum_node += sample_weight * responses_by_sample(sample);
   }
 
   // Initialize the variables to track the best split variable.
@@ -96,7 +96,7 @@ void RegressionSplittingRule::find_best_split_value(const Data& data,
                                                     size_t min_child_size,
                                                     double& best_value, size_t& best_var,
                                                     double& best_decrease, bool& best_send_missing_left,
-                                                    const std::vector<double>& responses_by_sample,
+                                                    const Eigen::ArrayXXd& responses_by_sample,
                                                     const std::vector<std::vector<size_t>>& samples) {
   // sorted_samples: the node samples in increasing order (may contain duplicated Xij). Length: size_node
   std::vector<double> possible_split_values;
@@ -122,7 +122,7 @@ void RegressionSplittingRule::find_best_split_value(const Data& data,
     size_t sample = sorted_samples[i];
     size_t next_sample = sorted_samples[i + 1];
     double sample_value = data.get(sample, var);
-    double response = responses_by_sample[sample];
+    double response = responses_by_sample(sample);
     double sample_weight = data.get_weight(sample);
 
     if (std::isnan(sample_value)) {

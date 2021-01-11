@@ -11,7 +11,6 @@ tune_forest(
   args,
   tune.parameters,
   tune.parameters.defaults,
-  tune.parameters.userinput,
   num.fit.trees,
   num.fit.reps,
   num.optimize.reps,

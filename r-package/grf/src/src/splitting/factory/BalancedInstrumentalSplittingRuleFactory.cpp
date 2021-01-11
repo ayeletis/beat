@@ -22,7 +22,7 @@ namespace grf {
 
 std::unique_ptr<SplittingRule> BalancedInstrumentalSplittingRuleFactory::create(size_t max_num_unique_values,
                                                                         const TreeOptions& options) const {
-  return std::unique_ptr<SplittingRule>(new InstrumentalSplittingRule(
+  return std::unique_ptr<SplittingRule>(new BalancedInstrumentalSplittingRule(
       max_num_unique_values,
       options.get_min_node_size(),
       options.get_alpha(),

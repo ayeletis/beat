@@ -1,11 +1,43 @@
 #' Causal survival forest (experimental)
 #'
 #' Trains a causal survival forest that can be used to estimate
-#' conditional average treatment effects theta(X). When the treatment assigment
-#' is unconfounded, we have theta(X) = E[T(1) - T(0) | X = x],
-#' where T is the survival time up to a fixed maximum follow-up time.
-#' T(1) and T(0) are potental outcomes corresponding to the two possible
+#' conditional average treatment effects tau(X). When the treatment assignment
+#' is unconfounded, we have tau(X) = E[Y(1) - Y(0) | X = x],
+#' where Y is the survival time up to a fixed maximum follow-up time.
+#' Y(1) and Y(0) are potental outcomes corresponding to the two possible
 #' treatment states.
+#'
+#' @section Statistical details:
+#' An important assumption for identifying the conditional average treatment effect tau(X)
+#' is that there exists a fixed positive constant M such that the probability of observing an
+#' event time past the maximum follow-up time Y.max is at least M (formally, we assume: P(Y
+#' >= Y.max | X) > M).
+#'
+#' This means that the individual censoring probabilities (by default estimated using a
+#' survival_forest on D' = 1 - D) should not get too low. This function provides a warning
+#' if these estimates get below 0.2, if they drop all the way down to below 0.05, we emit a
+#' stronger warning that you can not expect causal survival forest to deliver reliable
+#' estimates.
+#'
+#' The practical issue is that we can not reliably extrapolate the survival curves
+#' sufficiently far into the future (where most observations will be censored). A workaround
+#' is to re-define the estimand as the treatment effect up to some suitable maximum
+#' follow-up time Y.max. One can do this in practice by thresholding Y before running
+#' causal_survival_forest: D[Y >= Y.max] = 1 and Y[Y >= Y.max] = Y.max. The online vignette on
+#' survival data has more details.
+#'
+#' @section Computational details:
+#' Causal survival forest computes two nuisance components, the estimated survival
+#' and censoring curves (S.hat and C.hat). Recall that the Kaplan-Meier or
+#' Nelson-Aalen estimates of the survival curve is a step function that only
+#' changes at points at which there is an event D = 1 (or D' = 1 - D for the
+#' censoring curve). For very dense event data Y there may not be any accuracy
+#' benefit to fitting these curves on the complete grid compared with the
+#' computational cost, which scales as O(m*n) in each tree node (where
+#' m is the number of events in the node, and n the number of split points).
+#'
+#' The suggested resolution to this issue is to round or relabel the event data Y
+#' to a coarser resolution. The argument `failure.times` can be used for this purpose.
 #'
 #' @param X The covariates.
 #' @param Y The event time (may be negative).
@@ -31,8 +63,8 @@
 #'  If lambda.C.hat is NULL, this is estimated from C.hat using a forward difference. If provided:
 #'  a matrix of same dimensionality has C.hat.
 #'  Default is NULL.
-#' @param failure.times A vector of event times to fit the survival curves at. If NULL, then all the observed
-#'  failure times are used. This speeds up forest estimation by constraining the event grid. Observed event
+#' @param failure.times A vector of event times to fit the survival curves at. If NULL, then all the unique
+#'  event times are used. This speeds up forest estimation by constraining the event grid. Observed event
 #'  times are rounded down to the last sorted occurance less than or equal to the specified failure time.
 #'  The time points should be in increasing order.
 #'  Default is NULL.
@@ -103,8 +135,8 @@
 #' p <- 5
 #' X <- matrix(runif(n * p), n, p)
 #' W <- rbinom(n, 1, 0.5)
-#' tau <- 1
-#' failure.time <- pmin(rexp(n) * X[, 1] + W, tau)
+#' Y.max <- 1
+#' failure.time <- pmin(rexp(n) * X[, 1] + W, Y.max)
 #' censor.time <- 2 * runif(n)
 #' Y <- pmin(failure.time, censor.time)
 #' D <- as.integer(failure.time <= censor.time)
@@ -119,8 +151,8 @@
 #' r.monte.carlo <- rexp(5000)
 #' cate <- rep(NA, 10)
 #' for (i in 1:10) {
-#'   cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, tau) -
-#'                     pmin(r.monte.carlo * X.test[i, 1], tau))
+#'   cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, Y.max) -
+#'                     pmin(r.monte.carlo * X.test[i, 1], Y.max))
 #' }
 #' plot(X.test[, 1], cate, type = 'l', col = 'red')
 #' points(X.test[, 1], cs.pred$predictions)
@@ -188,6 +220,12 @@ causal_survival_forest <- function(X, Y, W, D,
   num.samples <- nrow(X)
   if (num.events <= 2) {
     stop("The number of distinct event times should be more than 2.")
+  }
+  if (num.samples > 5000 && num.events / num.samples > 0.1) {
+    warning(paste0("The number of events are more than 10% of the sample size. ",
+                   "To reduce the computational burden of fitting survival and ",
+                   "censoring curves, consider rounding the event values `Y` or ",
+                   "supplying a coarser grid with the `failure.times` argument. "))
   }
 
   args.orthog <- list(X = X,
@@ -297,16 +335,16 @@ causal_survival_forest <- function(X, Y, W, D,
 
  if (any(C.hat <= 0.05)) {
   warning(paste("Estimated censoring probabilites go as low as:", min(C.hat),
-                "- an identifying assumption is that there exist a fixed positve constant M",
-                "such that the probability of observing an event time past the maximum follow-up time tau",
-                "is at least M. Formally, we assume: P(Y >= tau | X) > M.",
+                "- an identifying assumption is that there exists a fixed positve constant M",
+                "such that the probability of observing an event time past the maximum follow-up time Y.max",
+                "is at least M. Formally, we assume: P(Y >= Y.max | X) > M.",
                 "This warning appears when M is less than 0.05, at which point causal survival forest",
                 "can not be expected to deliver reliable estimates."))
   } else if (any(C.hat < 0.2 & C.hat > 0.05)) {
     warning(paste("Estimated censoring probabilites are lower than 0.2.",
-                  "An identifying assumption is that there exist a fixed positve constant M",
-                  "such that the probability of observing an event time past the maximum follow-up time tau",
-                  "is at least M. Formally, we assume: P(Y >= tau | X) > M."))
+                  "An identifying assumption is that there exists a fixed positve constant M",
+                  "such that the probability of observing an event time past the maximum follow-up time Y.max",
+                  "is at least M. Formally, we assume: P(Y >= Y.max | X) > M."))
   }
 
   # Compute the pseudo outcomes
@@ -356,7 +394,7 @@ causal_survival_forest <- function(X, Y, W, D,
 
 #' Predict with a causal survival forest forest
 #'
-#' Gets estimates of theta(X) using a trained causal survival forest.
+#' Gets estimates of tau(X) using a trained causal survival forest.
 #'
 #' @param object The trained forest.
 #' @param newdata Points at which predictions should be made. If NULL, makes out-of-bag
@@ -366,7 +404,7 @@ causal_survival_forest <- function(X, Y, W, D,
 #'                matrix, and that the columns must appear in the same order.
 #' @param num.threads Number of threads used in training. If set to NULL, the software
 #'                    automatically selects an appropriate amount.
-#' @param estimate.variance Whether variance estimates for hat{theta}(x) are desired
+#' @param estimate.variance Whether variance estimates for hat{tau}(x) are desired
 #'                          (for confidence intervals).
 #' @param ... Additional arguments (currently ignored).
 #'
@@ -379,8 +417,8 @@ causal_survival_forest <- function(X, Y, W, D,
 #' p <- 5
 #' X <- matrix(runif(n * p), n, p)
 #' W <- rbinom(n, 1, 0.5)
-#' tau <- 1
-#' failure.time <- pmin(rexp(n) * X[, 1] + W, tau)
+#' Y.max <- 1
+#' failure.time <- pmin(rexp(n) * X[, 1] + W, Y.max)
 #' censor.time <- 2 * runif(n)
 #' Y <- pmin(failure.time, censor.time)
 #' D <- as.integer(failure.time <= censor.time)
@@ -395,8 +433,8 @@ causal_survival_forest <- function(X, Y, W, D,
 #' r.monte.carlo <- rexp(5000)
 #' cate <- rep(NA, 10)
 #' for (i in 1:10) {
-#'   cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, tau) -
-#'                     pmin(r.monte.carlo * X.test[i, 1], tau))
+#'   cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, Y.max) -
+#'                     pmin(r.monte.carlo * X.test[i, 1], Y.max))
 #' }
 #' plot(X.test[, 1], cate, type = 'l', col = 'red')
 #' points(X.test[, 1], cs.pred$predictions)
@@ -450,7 +488,7 @@ predict.causal_survival_forest <- function(object,
   do.call(cbind.data.frame, ret[!empty])
 }
 
-#' Compute pseudo outcomes (based on the influence function of theta(X) for each unit)
+#' Compute pseudo outcomes (based on the influence function of tau(X) for each unit)
 #' used for CART splitting.
 #'
 #' We compute:

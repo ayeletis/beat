@@ -35,10 +35,7 @@
 #include "splitting/factory/SurvivalSplittingRuleFactory.h"
 #include "splitting/factory/CausalSurvivalSplittingRuleFactory.h"
 #include "splitting/factory/BalancedInstrumentalSplittingRuleFactory.h"
-
 namespace grf {
-
-
 ForestTrainer balanced_instrumental_trainer(double reduced_form_weight,
                                    bool stabilize_splits) {
 
@@ -52,7 +49,6 @@ ForestTrainer balanced_instrumental_trainer(double reduced_form_weight,
                        std::move(splitting_rule_factory),
                        std::move(prediction_strategy));
 }
-
 
 ForestTrainer instrumental_trainer(double reduced_form_weight,
                                    bool stabilize_splits) {
@@ -87,7 +83,6 @@ ForestTrainer probability_trainer(size_t num_classes) {
                        std::move(splitting_rule_factory),
                        std::move(prediction_strategy));
 }
-
 ForestTrainer balanced_regression_trainer() {
   std::unique_ptr<RelabelingStrategy> relabeling_strategy(new NoopRelabelingStrategy());
   std::unique_ptr<SplittingRuleFactory> splitting_rule_factory(new RegressionSplittingRuleFactory());
@@ -97,7 +92,6 @@ ForestTrainer balanced_regression_trainer() {
                        std::move(splitting_rule_factory),
                        std::move(prediction_strategy));
 }
-
 ForestTrainer regression_trainer() {
   std::unique_ptr<RelabelingStrategy> relabeling_strategy(new NoopRelabelingStrategy());
   std::unique_ptr<SplittingRuleFactory> splitting_rule_factory(new RegressionSplittingRuleFactory());

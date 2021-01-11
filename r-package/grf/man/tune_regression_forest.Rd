@@ -24,10 +24,7 @@ tune_regression_forest(
   tune.num.reps = 100,
   tune.num.draws = 1000,
   num.threads = NULL,
-  seed = runif(1, 0, .Machine$integer.max),
-  target.weights = NULL,
-  target.avg.weights = NULL,
-  target.weight.penalty = 0
+  seed = runif(1, 0, .Machine$integer.max)
 )
 }
 \arguments{

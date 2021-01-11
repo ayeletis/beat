@@ -83,4 +83,5 @@ c.pred <- predict(c.forest)
 c.forest <- causal_forest(X, Y, W, num.trees = 500)
 c.pred <- predict(c.forest, X.test, estimate.variance = TRUE)
 }
+
 }

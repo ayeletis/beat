@@ -96,6 +96,94 @@ get_scores.causal_forest <- function(forest,
   tau.hat.pointwise + debiasing.weights * Y.residual
 }
 
+#' Compute doubly robust scores for a causal forest.
+#'
+#' Compute doubly robust (AIPW) scores for average treatment effect estimation
+#' or average partial effect estimation with continuous treatment,
+#' using a causal forest. Under regularity conditions, the average of the DR.scores
+#' is an efficient estimate of the average treatment effect.
+#'
+#' @param forest A trained causal forest.
+#' @param subset Specifies subset of the training examples over which we
+#'               estimate the ATE. WARNING: For valid statistical performance,
+#'               the subset should be defined only using features Xi, not using
+#'               the treatment Wi or the outcome Yi.
+#' @param debiasing.weights A vector of length n (or the subset length) of debiasing weights.
+#'               If NULL (default) they are obtained via inverse-propensity weighting in the case
+#'               of binary treatment or by estimating Var[W | X = x] using a new forest
+#'               in the case of a continuous treatment.
+#' @param num.trees.for.weights Number of trees used to estimate Var[W | X = x]. Note: this
+#'               argument is only used when debiasing.weights = NULL.
+#' @param ... Additional arguments (currently ignored).
+#'
+#' @references Farrell, Max H. "Robust inference on average treatment effects with
+#'             possibly more covariates than observations." Journal of Econometrics
+#'             189(1), 2015.
+#' @references Graham, Bryan S., and Cristine Campos de Xavier Pinto. "Semiparametrically
+#'             efficient estimation of the average linear regression function." arXiv preprint
+#'             arXiv:1810.12511, 2018.
+#' @references Hirshberg, David A., and Stefan Wager. "Augmented minimax linear estimation."
+#'             arXiv preprint arXiv:1712.00038, 2017.
+#' @references Robins, James M., and Andrea Rotnitzky. "Semiparametric efficiency in
+#'             multivariate regression models with missing data." Journal of the
+#'             American Statistical Association 90(429), 1995.
+#'
+#' @method get_scores balanced_causal_forest
+#' @export
+get_scores.balanced_causal_forest <- function(forest,
+                                     subset = NULL,
+                                     debiasing.weights = NULL,
+                                     num.trees.for.weights = 500,
+                                     ...) {
+  subset <- validate_subset(forest, subset)
+  W.orig <- forest$W.orig[subset]
+  W.hat <- forest$W.hat[subset]
+  Y.orig <- forest$Y.orig[subset]
+  Y.hat <- forest$Y.hat[subset]
+  tau.hat.pointwise <- predict(forest)$predictions[subset]
+
+  binary.W <- all(forest$W.orig %in% c(0, 1))
+
+  if (is.null(debiasing.weights)) {
+    if (binary.W) {
+      debiasing.weights <- (W.orig - W.hat) / (W.hat * (1 - W.hat))
+    } else {
+      # Start by learning debiasing weights if needed.
+      # The goal is to estimate the variance of W given X. For binary treatments,
+      # we get a good implicit estimator V.hat = e.hat (1 - e.hat), and
+      # so this step is not needed. Note that if we use the present CAPE estimator
+      # with a binary treatment and set V.hat = e.hat (1 - e.hat), then we recover
+      # exactly the AIPW estimator of the CATE.
+      clusters <- if (length(forest$clusters) > 0) {
+        forest$clusters
+      } else {
+        1:length(forest$Y.orig)
+      }
+      variance_forest <- regression_forest(forest$X.orig,
+                                           (forest$W.orig - forest$W.hat)^2,
+                                           clusters = clusters,
+                                           sample.weights = forest$sample.weights,
+                                           num.trees = num.trees.for.weights,
+                                           ci.group.size = 1)
+      V.hat <- predict(variance_forest)$predictions
+      debiasing.weights.all <- (forest$W.orig - forest$W.hat) / V.hat
+      debiasing.weights <- debiasing.weights.all[subset]
+    }
+  } else if (length(debiasing.weights) == length(forest$Y.orig)) {
+    debiasing.weights <- debiasing.weights[subset]
+  } else if (length(debiasing.weights) != length(subset))  {
+    stop("If specified, debiasing.weights must have length n or |subset|.")
+  }
+
+  # Form AIPW scores. Note: We are implicitly using the following
+  # estimates for the regression surfaces E[Y|X, W=0/1]:
+  # Y.hat.0 <- Y.hat - W.hat * tau.hat.pointwise
+  # Y.hat.1 <- Y.hat + (1 - W.hat) * tau.hat.pointwise
+  Y.residual <- Y.orig - (Y.hat + tau.hat.pointwise * (W.orig - W.hat))
+
+  tau.hat.pointwise + debiasing.weights * Y.residual
+}
+
 #' Doubly robust scores for estimating the average conditional local average treatment effect.
 #'
 #' Given an outcome Y, treatment W and instrument Z, the (conditional) local

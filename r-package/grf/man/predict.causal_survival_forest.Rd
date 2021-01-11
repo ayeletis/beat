@@ -24,7 +24,7 @@ matrix, and that the columns must appear in the same order.}
 \item{num.threads}{Number of threads used in training. If set to NULL, the software
 automatically selects an appropriate amount.}
 
-\item{estimate.variance}{Whether variance estimates for hat{theta}(x) are desired
+\item{estimate.variance}{Whether variance estimates for hat{tau}(x) are desired
 (for confidence intervals).}
 
 \item{...}{Additional arguments (currently ignored).}
@@ -33,7 +33,7 @@ automatically selects an appropriate amount.}
 Vector of predictions.
 }
 \description{
-Gets estimates of theta(X) using a trained causal survival forest.
+Gets estimates of tau(X) using a trained causal survival forest.
 }
 \examples{
 \donttest{
@@ -42,8 +42,8 @@ n <- 3000
 p <- 5
 X <- matrix(runif(n * p), n, p)
 W <- rbinom(n, 1, 0.5)
-tau <- 1
-failure.time <- pmin(rexp(n) * X[, 1] + W, tau)
+Y.max <- 1
+failure.time <- pmin(rexp(n) * X[, 1] + W, Y.max)
 censor.time <- 2 * runif(n)
 Y <- pmin(failure.time, censor.time)
 D <- as.integer(failure.time <= censor.time)
@@ -58,8 +58,8 @@ cs.pred <- predict(cs.forest, X.test, estimate.variance = TRUE)
 r.monte.carlo <- rexp(5000)
 cate <- rep(NA, 10)
 for (i in 1:10) {
-  cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, tau) -
-                    pmin(r.monte.carlo * X.test[i, 1], tau))
+  cate[i] <- mean(pmin(r.monte.carlo * X.test[i, 1] + 1, Y.max) -
+                    pmin(r.monte.carlo * X.test[i, 1], Y.max))
 }
 plot(X.test[, 1], cate, type = 'l', col = 'red')
 points(X.test[, 1], cs.pred$predictions)

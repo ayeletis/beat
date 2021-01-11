@@ -22,13 +22,13 @@ Depends:
 License: GPL-3
 LinkingTo: Rcpp, RcppEigen
 Imports:
+	data.table,
     DiceKriging,
     lmtest,
     Matrix,
     methods,
     Rcpp (>= 0.12.15),
-    sandwich (>= 2.4-0),
-	data.table
+    sandwich (>= 2.4-0)
 RoxygenNote: 7.1.1
 Suggests:
     DiagrammeR,

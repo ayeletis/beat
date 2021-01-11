@@ -29,8 +29,7 @@ boosted_regression_forest(
   boost.max.steps = 5,
   boost.trees.tune = 10,
   num.threads = NULL,
-  seed = runif(1, 0, .Machine$integer.max),
-  target.weights = NULL
+  seed = runif(1, 0, .Machine$integer.max)
 )
 }
 \arguments{
