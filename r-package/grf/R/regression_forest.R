@@ -8,7 +8,7 @@
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
-#' @param sample.weights Weights given to an observation in estimation.
+#' @param sample.weights (experimental) Weights given to an observation in estimation.
 #'                       If NULL, each observation is given the same weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
 #'  Default is NULL (ignored).
@@ -86,6 +86,8 @@
 #' }
 #'
 #' @export
+#' @useDynLib grf
+#' @importFrom Rcpp evalCpp
 #' @importFrom utils modifyList
 regression_forest <- function(X, Y,
                               num.trees = 2000,
@@ -93,11 +95,6 @@ regression_forest <- function(X, Y,
                               clusters = NULL,
                               equalize.cluster.weights = FALSE,
                               sample.fraction = 0.5,
-                              target.weights = NULL,
-                              #target.weights.hat = NULL,
-                              target.weight.penalty = 0,
-                              target.weight.bins.breaks = 256,
-                              target.weight.standardize = TRUE,
                               mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
                               min.node.size = 5,
                               honesty = TRUE,
@@ -113,38 +110,15 @@ regression_forest <- function(X, Y,
                               compute.oob.predictions = TRUE,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max)) {
-
-
-  all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
-
-
   has.missing.values <- validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
-
-
-  # target weight
-  if(!is.null(target.weights)){
-    stopifnot(dim(target.weights)[1] == dim(X)[1])
-    if(isTRUE(target.weight.standardize)  ){
-      target.weights = apply(target.weights, 2, standardize) # per column
-    }
-
-  }else{
-    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
-    target.weights = as.matrix(replicate(NROW(X), 0))
-  }
-  #output list : [num x feture] [[num rows, num target weight feature]]
-  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
-                                                    num_breaks = target.weight.bins.breaks)
-
-
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
 
-
+  all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
 
   data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
   args <- list(num.trees = num.trees,
@@ -161,10 +135,7 @@ regression_forest <- function(X, Y,
                ci.group.size = ci.group.size,
                compute.oob.predictions = compute.oob.predictions,
                num.threads = num.threads,
-               seed = seed,
-               target.avg.weights = target.avg.weights,
-               target.weight.penalty = target.weight.penalty
-               )
+               seed = seed)
 
   tuning.output <- NULL
   if (!identical(tune.parameters, "none")){
@@ -186,14 +157,11 @@ regression_forest <- function(X, Y,
                                             tune.num.reps = tune.num.reps,
                                             tune.num.draws = tune.num.draws,
                                             num.threads = num.threads,
-                                            seed = seed,
-                                            target.avg.weights = target.avg.weights,
-                                            target.weight.penalty = target.weight.penalty
-                                        )
+                                            seed = seed)
     args <- modifyList(args, as.list(tuning.output[["params"]]))
   }
 
-  forest <- do.call.rcpp(regression_train, c(data, args)) # change
+  forest <- do.call.rcpp(regression_train, c(data, args))
   class(forest) <- c("regression_forest", "grf")
   forest[["ci.group.size"]] <- ci.group.size
   forest[["X.orig"]] <- X

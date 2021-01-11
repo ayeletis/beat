@@ -8,7 +8,7 @@
 #'              over treatment. See section 6.1.1 of the GRF paper for
 #'              further discussion of this quantity.
 #' @param W.hat Estimates of the treatment propensities E[W | Xi].
-#' @param sample.weights Weights given to an observation in estimation.
+#' @param sample.weights (experimental) Weights given to an observation in estimation.
 #'                       If NULL, each observation is given the same weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
 #'  Default is NULL (ignored).
@@ -107,9 +107,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               tune.num.reps = 50,
                               tune.num.draws = 1000,
                               num.threads = NULL,
-                              seed = runif(1, 0, .Machine$integer.max),
-                              target.avg.weights=NULL,
-                              target.weight.penalty=0) {
+                              seed = runif(1, 0, .Machine$integer.max)) {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
@@ -119,11 +117,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
-
-  if( is.null(target.avg.weights) || max(sapply(target.avg.weights, function(x) max(abs(x))))  == 0  ){
-    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
-  }
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
 
   default.parameters <- list(sample.fraction = 0.5,
                              mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
@@ -131,22 +125,12 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                              honesty.fraction = 0.5,
                              honesty.prune.leaves = TRUE,
                              alpha = 0.05,
-                             imbalance.penalty = 0,
-                             target.weight.penalty=0)
-
-  userinput.parameters <- list(
-                            sample.fraction = sample.fraction,
-                            mtry =mtry,
-                            min.node.size = min.node.size,
-                            honesty.fraction = honesty.fraction,
-                            honesty.prune.leaves = honesty.prune.leaves,
-                            alpha = alpha,
-                            imbalance.penalty = imbalance.penalty,
-                            target.weight.penalty=target.weight.penalty )
+                             imbalance.penalty = 0)
 
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
-  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered, sample.weights = sample.weights)
+  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
+                              sample.weights = sample.weights)
   nrow.X <- nrow(X)
   ncol.X <- ncol(X)
   args <- list(clusters = clusters,
@@ -163,9 +147,7 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                ci.group.size = ci.group.size,
                num.threads = num.threads,
                seed = seed,
-               reduced.form.weight = 0,
-               target.avg.weights=target.avg.weights,
-               target.weight.penalty=target.weight.penalty)
+               reduced.form.weight = 0)
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params
@@ -177,8 +159,6 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   }
 
   tune.parameters.defaults <- default.parameters[tune.parameters]
-  tune.parameters.userinput <- userinput.parameters[tune.parameters]
-
   train <- causal_train
 
   tuning.output <- tune_forest(data = data,
@@ -187,7 +167,6 @@ tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                                args = args,
                                tune.parameters = tune.parameters,
                                tune.parameters.defaults = tune.parameters.defaults,
-                               tune.parameters.userinput = tune.parameters.userinput,
                                num.fit.trees = tune.num.trees,
                                num.fit.reps = tune.num.reps,
                                num.optimize.reps = tune.num.draws,

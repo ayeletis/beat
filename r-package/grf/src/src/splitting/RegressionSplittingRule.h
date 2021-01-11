@@ -35,7 +35,7 @@ public:
   bool find_best_split(const Data& data,
                        size_t node,
                        const std::vector<size_t>& possible_split_vars,
-                       const Eigen::ArrayXXd& responses_by_sample,
+                       const std::vector<double>& responses_by_sample,
                        const std::vector<std::vector<size_t>>& samples,
                        std::vector<size_t>& split_vars,
                        std::vector<double>& split_values,
@@ -53,7 +53,7 @@ private:
                              size_t& best_var,
                              double& best_decrease,
                              bool& best_send_missing_left,
-                             const Eigen::ArrayXXd& responses_by_sample,
+                             const std::vector<double>& responses_by_sample,
                              const std::vector<std::vector<size_t>>& samples);
 
   size_t* counter;
@@ -62,8 +62,6 @@ private:
 
   double alpha;
   double imbalance_penalty;
-  double* target_left_weights;
-
 
   DISALLOW_COPY_AND_ASSIGN(RegressionSplittingRule);
 };

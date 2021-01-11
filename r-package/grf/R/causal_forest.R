@@ -21,7 +21,7 @@
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
-#' @param sample.weights Weights given to each sample in estimation.
+#' @param sample.weights (experimental) Weights given to each sample in estimation.
 #'                       If NULL, each observation receives the same weight.
 #'                       Note: To avoid introducing confounding, weights should be
 #'                       independent of the potential outcomes given X. Default is NULL.
@@ -137,17 +137,11 @@
 #' }
 #'
 #' @export
-causal_forest <- function(X,
-                          Y,
-                          W,
+causal_forest <- function(X, Y, W,
                           Y.hat = NULL,
                           W.hat = NULL,
                           num.trees = 2000,
                           sample.weights = NULL,
-                          target.weights = NULL,
-                          target.weight.penalty = 0,
-                          target.weight.bins.breaks = 256,
-                          target.weight.standardize = TRUE,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -168,79 +162,40 @@ causal_forest <- function(X,
                           orthog.boosting = FALSE,
                           num.threads = NULL,
                           seed = runif(1, 0, .Machine$integer.max)) {
-
   has.missing.values <- validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   W <- validate_observations(W, X)
-
-
-  # target weight
-  if(!is.null(target.weights)){
-    stopifnot(dim(target.weights)[1] == dim(X)[1])
-    if(isTRUE(target.weight.standardize)  ){
-      target.weights = apply(target.weights, 2, standardize) # per column
-    }
-
-  }else{
-    target.weights = as.matrix(replicate(NROW(X), 0))
-  }
-
-  #output list : [num x feture] [[num rows, num target weight feature]]
-  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
-                                                    num_breaks = target.weight.bins.breaks)
-  ##
-
   clusters <- validate_clusters(clusters, X)
-  samples.per.cluster <-
-    validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
+  samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
 
-  all.tunable.params <- c(
-    "sample.fraction",
-    "mtry",
-    "min.node.size",
-    "honesty.fraction",
-    "honesty.prune.leaves",
-    "alpha",
-    "imbalance.penalty",
-    "target.weight.penalty"
-  )
+  all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
 
-  if(max(abs(target.weights)) == 0){
-    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
-  }
-
-
-
-  args.orthog <- list(
-    X = X,
-    num.trees = max(50, num.trees / 4),
-    sample.weights = sample.weights,
-    #target.weights =  target.weights,
-    #target.weight.penalty=target.weight.penalty,
-    clusters = clusters,
-    equalize.cluster.weights = equalize.cluster.weights,
-    sample.fraction = sample.fraction,
-    mtry = mtry,
-    min.node.size = 5,
-    honesty = TRUE,
-    honesty.fraction = 0.5,
-    honesty.prune.leaves = honesty.prune.leaves,
-    alpha = alpha,
-    imbalance.penalty = imbalance.penalty,
-    ci.group.size = 1,
-    tune.parameters = tune.parameters,
-    #num.threads = num.threads,
-    seed = seed # ,
-  )
+  args.orthog <- list(X = X,
+                     num.trees = max(50, num.trees / 4),
+                     sample.weights = sample.weights,
+                     clusters = clusters,
+                     equalize.cluster.weights = equalize.cluster.weights,
+                     sample.fraction = sample.fraction,
+                     mtry = mtry,
+                     min.node.size = 5,
+                     honesty = TRUE,
+                     honesty.fraction = 0.5,
+                     honesty.prune.leaves = honesty.prune.leaves,
+                     alpha = alpha,
+                     imbalance.penalty = imbalance.penalty,
+                     ci.group.size = 1,
+                     tune.parameters = tune.parameters,
+                     num.threads = num.threads,
+                     seed = seed)
 
   if (is.null(Y.hat) && !orthog.boosting) {
     forest.Y <- do.call(regression_forest, c(Y = list(Y), args.orthog))
     Y.hat <- predict(forest.Y)$predictions
   } else if (is.null(Y.hat) && orthog.boosting) {
-    forest.Y <-
-      do.call(boosted_regression_forest, c(Y = list(Y), args.orthog))
+    forest.Y <- do.call(boosted_regression_forest, c(Y = list(Y), args.orthog))
     Y.hat <- predict(forest.Y)$predictions
   } else if (length(Y.hat) == 1) {
     Y.hat <- rep(Y.hat, nrow(X))
@@ -252,8 +207,7 @@ causal_forest <- function(X,
     forest.W <- do.call(regression_forest, c(Y = list(W), args.orthog))
     W.hat <- predict(forest.W)$predictions
   } else if (is.null(W.hat) && orthog.boosting) {
-    forest.W <-
-      do.call(boosted_regression_forest, c(Y = list(W), args.orthog))
+    forest.W <- do.call(boosted_regression_forest, c(Y = list(W), args.orthog))
     W.hat <- predict(forest.W)$predictions
   } else if (length(W.hat) == 1) {
     W.hat <- rep(W.hat, nrow(X))
@@ -261,92 +215,50 @@ causal_forest <- function(X,
     stop("W.hat has incorrect length.")
   }
 
-  # orthog target weight matrix for multi reg
-  args.target = copy(args.orthog)
-  remove_args = c("ci.group.size",'tune.parameters')
-  for(i in remove_args){
-    args.target[i] = NULL
-  }
-
-  # if(sum(abs(target.weights))>0){
-  #   if (is.null(target.weights.hat) && !orthog.boosting) {
-  #     forest.weight <- do.call(multi_regression_forest, c(Y = list(target.weights), args.target))
-  #     target.weights.hat <- predict(forest.weight)$predictions
-  #   } else if (is.null(target.weights.hat) && orthog.boosting) {
-  #     forest.weight <-
-  #       do.call(boosted_regression_forest, c(Y = list(target.weights), args.target))
-  #     target.weights.hat <- predict(forest.weight)$predictions
-  #   } else if (length(target.weights.hat) == 1) {
-  #     target.weights.hat <- rep(target.weights.hat, nrow(X))
-  #   } else if (length(target.weights.hat) != nrow(X)) {
-  #     stop("Target weight has incorrect length.")
-  #   }
-  # }else{
-  #   target.weights.hat = target.weights
-  # }
-
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
-
-
-  data <- create_train_matrices(
-    X,
-    outcome = Y.centered,
-    treatment = W.centered,
-    sample.weights = sample.weights)
-
-  args <- list(
-    num.trees = num.trees,
-    target.avg.weights = target.avg.weights,
-    target.weight.penalty = target.weight.penalty,
-    clusters = clusters,
-    samples.per.cluster = samples.per.cluster,
-    sample.fraction = sample.fraction,
-    mtry = mtry,
-    min.node.size = min.node.size,
-    honesty = honesty,
-    honesty.fraction = honesty.fraction,
-    honesty.prune.leaves = honesty.prune.leaves,
-    alpha = alpha,
-    imbalance.penalty = imbalance.penalty,
-    stabilize.splits = stabilize.splits,
-    ci.group.size = ci.group.size,
-    compute.oob.predictions = compute.oob.predictions,
-    num.threads = num.threads,
-    seed = seed,
-    reduced.form.weight = 0
-  )
+  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
+                              sample.weights = sample.weights)
+  args <- list(num.trees = num.trees,
+               clusters = clusters,
+               samples.per.cluster = samples.per.cluster,
+               sample.fraction = sample.fraction,
+               mtry = mtry,
+               min.node.size = min.node.size,
+               honesty = honesty,
+               honesty.fraction = honesty.fraction,
+               honesty.prune.leaves = honesty.prune.leaves,
+               alpha = alpha,
+               imbalance.penalty = imbalance.penalty,
+               stabilize.splits = stabilize.splits,
+               ci.group.size = ci.group.size,
+               compute.oob.predictions = compute.oob.predictions,
+               num.threads = num.threads,
+               seed = seed,
+               reduced.form.weight = 0)
 
   tuning.output <- NULL
-  if (!identical(tune.parameters, "none")) {
-    tuning.output <- tune_causal_forest(
-      X,
-      Y,
-      W,
-      Y.hat,
-      W.hat,
-      sample.weights = sample.weights,
-      target.avg.weights = target.avg.weights,
-      target.weight.penalty = target.weight.penalty,
-      clusters = clusters,
-      equalize.cluster.weights = equalize.cluster.weights,
-      sample.fraction = sample.fraction,
-      mtry = mtry,
-      min.node.size = min.node.size,
-      honesty = honesty,
-      honesty.fraction = honesty.fraction,
-      honesty.prune.leaves = honesty.prune.leaves,
-      alpha = alpha,
-      imbalance.penalty = imbalance.penalty,
-      stabilize.splits = stabilize.splits,
-      ci.group.size = ci.group.size,
-      tune.parameters = tune.parameters,
-      tune.num.trees = tune.num.trees,
-      tune.num.reps = tune.num.reps,
-      tune.num.draws = tune.num.draws,
-      num.threads = num.threads,
-      seed = seed
-    )
+  if (!identical(tune.parameters, "none")){
+    tuning.output <- tune_causal_forest(X, Y, W, Y.hat, W.hat,
+                                        sample.weights = sample.weights,
+                                        clusters = clusters,
+                                        equalize.cluster.weights = equalize.cluster.weights,
+                                        sample.fraction = sample.fraction,
+                                        mtry = mtry,
+                                        min.node.size = min.node.size,
+                                        honesty = honesty,
+                                        honesty.fraction = honesty.fraction,
+                                        honesty.prune.leaves = honesty.prune.leaves,
+                                        alpha = alpha,
+                                        imbalance.penalty = imbalance.penalty,
+                                        stabilize.splits = stabilize.splits,
+                                        ci.group.size = ci.group.size,
+                                        tune.parameters = tune.parameters,
+                                        tune.num.trees = tune.num.trees,
+                                        tune.num.reps = tune.num.reps,
+                                        tune.num.draws = tune.num.draws,
+                                        num.threads = num.threads,
+                                        seed = seed)
     args <- modifyList(args, as.list(tuning.output[["params"]]))
   }
 
@@ -429,31 +341,24 @@ causal_forest <- function(X,
 #' c.forest <- causal_forest(X, Y, W, num.trees = 500)
 #' c.pred <- predict(c.forest, X.test, estimate.variance = TRUE)
 #' }
+#'
 #' @method predict causal_forest
 #' @export
-predict.causal_forest <- function(object,
-                                  newdata = NULL,
+predict.causal_forest <- function(object, newdata = NULL,
                                   linear.correction.variables = NULL,
                                   ll.lambda = NULL,
                                   ll.weight.penalty = FALSE,
                                   num.threads = NULL,
-                                  estimate.variance = FALSE,
-                                  ...) {
+                                  estimate.variance = FALSE, ...) {
   local.linear <- !is.null(linear.correction.variables)
   allow.na <- !local.linear
 
   # If possible, use pre-computed predictions.
-  if (is.null(newdata) &&
-    !estimate.variance &&
-    !local.linear &&
-    !is.null(object$predictions)) {
-    return(
-      data.frame(
-        predictions = object$predictions,
-        debiased.error = object$debiased.error,
-        excess.error = object$excess.error
-      )
-    )
+  if (is.null(newdata) && !estimate.variance && !local.linear && !is.null(object$predictions)) {
+    return(data.frame(
+      predictions = object$predictions,
+      debiased.error = object$debiased.error,
+      excess.error = object$excess.error))
   }
 
   num.threads <- validate_num_threads(num.threads)
@@ -461,19 +366,15 @@ predict.causal_forest <- function(object,
   X <- object[["X.orig"]]
   Y.centered <- object[["Y.orig"]] - object[["Y.hat"]]
   W.centered <- object[["W.orig"]] - object[["W.hat"]]
-  target.weights <-
-    train.data <-
-      create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
+  train.data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
 
   if (local.linear) {
-    linear.correction.variables <-
-      validate_ll_vars(linear.correction.variables, ncol(X))
+    linear.correction.variables <- validate_ll_vars(linear.correction.variables, ncol(X))
 
     if (is.null(ll.lambda)) {
-      ll.regularization.path <- tune_ll_causal_forest(object,
-                                                      linear.correction.variables,
-                                                      ll.weight.penalty,
-                                                      num.threads)
+      ll.regularization.path <- tune_ll_causal_forest(
+        object, linear.correction.variables,
+        ll.weight.penalty, num.threads)
       ll.lambda <- ll.regularization.path$lambda.min
     } else {
       ll.lambda <- validate_ll_lambda(ll.lambda)
@@ -481,82 +382,31 @@ predict.causal_forest <- function(object,
 
     # Subtract 1 to account for C++ indexing
     linear.correction.variables <- linear.correction.variables - 1
-  }
-  args <- list(
-    forest.object = forest.short,
-    num.threads = num.threads,
-    estimate.variance = estimate.variance
-  )
-  ll.args <- list(
-    ll.lambda = ll.lambda,
-    ll.weight.penalty = ll.weight.penalty,
-    linear.correction.variables = linear.correction.variables
-  )
+   }
+   args <- list(forest.object = forest.short,
+                num.threads = num.threads,
+                estimate.variance = estimate.variance)
+   ll.args <- list(ll.lambda = ll.lambda,
+                   ll.weight.penalty = ll.weight.penalty,
+                   linear.correction.variables = linear.correction.variables)
 
-  if (!is.null(newdata)) {
-    validate_newdata(newdata, X, allow.na = allow.na)
-    test.data <- create_test_matrices(newdata)
-    if (!local.linear) {
-      ret <- do.call.rcpp(causal_predict, c(train.data, test.data, args))
-    } else {
-      ret <-
-        do.call.rcpp(ll_causal_predict,
-                     c(train.data, test.data, args, ll.args))
-    }
-  } else {
-    if (!local.linear) {
-      ret <- do.call.rcpp(causal_predict_oob, c(train.data, args))
-    } else {
-      ret <-
-        do.call.rcpp(ll_causal_predict_oob, c(train.data, args, ll.args))
-    }
+   if (!is.null(newdata)) {
+     validate_newdata(newdata, X, allow.na = allow.na)
+     test.data <- create_test_matrices(newdata)
+     if (!local.linear) {
+       ret <- do.call.rcpp(causal_predict, c(train.data, test.data, args))
+     } else {
+       ret <- do.call.rcpp(ll_causal_predict, c(train.data, test.data, args, ll.args))
+     }
+   } else {
+     if (!local.linear) {
+       ret <- do.call.rcpp(causal_predict_oob, c(train.data, args))
+     } else {
+       ret <- do.call.rcpp(ll_causal_predict_oob, c(train.data, args, ll.args))
+     }
   }
 
   # Convert list to data frame.
-  empty <- sapply(ret, function(elem)
-    length(elem) == 0)
+  empty <- sapply(ret, function(elem) length(elem) == 0)
   do.call(cbind.data.frame, ret[!empty])
-}
-
-standardize = function(x){
-  if(length(unique(x))==1){
-    return( scale(x, center=TRUE, scale=FALSE))
-  }else{
-    return(scale(x, center=TRUE, scale=TRUE))
-  }
-}
-construct_target_weight_mean = function(x, z, num_breaks = 256) {
-  calculate_avg = function(dat, x_col, z_col, num_breaks) {
-    df = dat[, .SD, .SDcols = c(x_col, z_col)]
-    df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
-    # if(isTRUE(demean)){
-    #   df[, (z_col) := get(z_col) - mean(get(z_col))]
-    # }
-    df[, mean_value := mean(get(z_col)), by = cut_bins]
-    out = df[, mean_value]
-    # out = df[, mean_value] # if z is orthogonal (z hat)
-    # if(isTRUE(demean)){
-    #   out = df[, mean_value - mean(mean_value)]
-    # }else{
-    #   out = df[, mean_value]
-    # }
-    return(out)
-  }
-
-  stopifnot(is.matrix(z))
-  stopifnot(dim(x)[1] == dim(z)[1])
-  dat = as.data.table(x)
-  x_cols = paste0('x_', 1:dim(x)[2])
-  names(dat) = x_cols
-  dat_z = as.data.table(z)
-  z_cols = paste0("z_", 1:dim(z)[2])
-  names(dat_z) = z_cols
-  dat = cbind(dat, dat_z)
-  # output matrix: 3D [var, n, z]
-  out = vector('list', length = length(x_cols))
-  for (i in 1:length(x_cols)) {
-    out[[i]] = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
-  }
-
-  return(out)
 }

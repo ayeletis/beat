@@ -115,7 +115,7 @@ get_tree <- function(forest, index) {
 #' @examples
 #' \donttest{
 #' # Train a quantile forest.
-#' n <- 250
+#' n <- 50
 #' p <- 10
 #' X <- matrix(rnorm(n * p), n, p)
 #' Y <- X[, 1] * rnorm(n)
@@ -145,7 +145,7 @@ split_frequencies <- function(forest, max.depth = 4) {
 #' @examples
 #' \donttest{
 #' # Train a quantile forest.
-#' n <- 250
+#' n <- 50
 #' p <- 10
 #' X <- matrix(rnorm(n * p), n, p)
 #' Y <- X[, 1] * rnorm(n)
@@ -213,85 +213,6 @@ get_sample_weights <- function(forest, newdata = NULL, num.threads = NULL) {
   }
 }
 
-#' Find the leaf node for a test sample.
-#'
-#' Given a GRF tree object, compute the leaf node a test sample falls into. The nodes in a GRF tree
-#' are numbered breadth first, and the returned numbers will be the leaf integer according
-#' to this ordering. To get sample weights based on leaf membership, see the function
-#' \code{\link{get_sample_weights}}.
-#'
-#' @param tree A GRF tree object (retrieved by `get_tree`).
-#' @param newdata Points at which leaf predictions should be made.
-#' @param node.id Boolean indicating whether to return the node.id for each query sample (default), or
-#'  if FALSE, a list of node numbers with the samples contained.
-#' @return A vector of integers indicating the leaf number for each sample in the given tree.
-#'
-#' @examples
-#' \donttest{
-#' p <- 10
-#' n <- 100
-#' X <- matrix(2 * runif(n * p) - 1, n, p)
-#' Y <- (X[, 1] > 0) + 2 * rnorm(n)
-#' r.forest <- regression_forest(X, Y, num.tree = 50)
-#'
-#' n.test <- 5
-#' X.test <- matrix(2 * runif(n.test * p) - 1, n.test, p)
-#' tree <- get_tree(r.forest, 1)
-#' # Get a vector of node numbers for each sample.
-#' get_leaf_node(tree, X.test)
-#' # Get a list of samples per node.
-#' get_leaf_node(tree, X.test, node.id = FALSE)
-#' }
-#'
-#' @export
-get_leaf_node <- function(tree, newdata, node.id = TRUE) {
-  if (!("grf_tree" %in% class(tree))) {
-    stop("get_leaf_node is only implemented for class `grf_tree`")
-  }
-  validate_X(newdata, allow.na = TRUE)
-  num.samples <- nrow(newdata)
-  num.features <- ncol(newdata)
-  leaf.nodes <- rep(0, num.samples)
-
-  for (i in 1:num.samples) {
-    # Start at root node
-    node <- 1
-    # The following logic is verbatim from "Tree.cpp::find_leaf_node"
-    # `isTRUE(value <= split_val)` is to emulate C++ logic where any
-    # boolean operator with NA operand evaluates to FALSE.
-    while (TRUE) {
-      if (tree$nodes[[node]]$is_leaf) {
-        break()
-      }
-      split_var <- tree$nodes[[node]]$split_variable
-      split_val <- tree$nodes[[node]]$split_value
-      if (split_var > num.features) {
-        stop("Test data with fewer features than original training data provided.")
-      }
-      value <- newdata[i, split_var]
-      send_na_left <- tree$nodes[[node]]$send_missing_left
-      if (
-          (isTRUE(value <= split_val)) || # ordinary split
-          (send_na_left && is.na(value)) || # are we sending NaN left
-          (is.na(split_val) && is.na(value)) # are we splitting on NaN
-        ) {
-        # Move to the left child
-        node <- tree$nodes[[node]]$left_child
-      } else {
-        # Move to the right child
-        node <- tree$nodes[[node]]$right_child
-      }
-    }
-    leaf.nodes[i] <- node
-  }
-
-  if (node.id) {
-    return (leaf.nodes)
-  } else {
-    return (split(1:nrow(newdata), leaf.nodes))
-  }
-}
-
 leaf_stats <- function(forest, samples) UseMethod("leaf_stats")
 
 #' A default leaf_stats for forests classes without a leaf_stats method
@@ -303,7 +224,6 @@ leaf_stats <- function(forest, samples) UseMethod("leaf_stats")
 #' @return NULL
 #'
 #' @method leaf_stats default
-#' @keywords internal
 leaf_stats.default <- function(forest, samples, ...){
   return(NULL)
 }
@@ -316,7 +236,6 @@ leaf_stats.default <- function(forest, samples, ...){
 #' @return A named vector containing summary stats
 #'
 #' @method leaf_stats regression_forest
-#' @keywords internal
 leaf_stats.regression_forest <- function(forest, samples, ...){
   leaf_stats <- c()
   leaf_stats["avg_Y"] <- round(mean(forest$Y.orig[samples]), 2)
@@ -331,7 +250,6 @@ leaf_stats.regression_forest <- function(forest, samples, ...){
 #' @return A named vector containing summary stats
 #'
 #' @method leaf_stats causal_forest
-#' @keywords internal
 leaf_stats.causal_forest <- function(forest, samples, ...){
   leaf_stats <- c()
   leaf_stats["avg_Y"] <- round(mean(forest$Y.orig[samples]), 2)
@@ -347,7 +265,6 @@ leaf_stats.causal_forest <- function(forest, samples, ...){
 #' @return A named vector containing summary stats
 #'
 #' @method leaf_stats instrumental_forest
-#' @keywords internal
 leaf_stats.instrumental_forest <- function(forest, samples, ...){
 
   leaf_stats <- c()

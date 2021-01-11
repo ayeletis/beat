@@ -17,63 +17,62 @@
 
 #ifndef GRF_INSTRUMENTALSPLITTINGRULE_H
 #define GRF_INSTRUMENTALSPLITTINGRULE_H
-#include <Rcpp.h>
-#include <RcppEigen.h>
+
+#include "commons/Data.h"
 #include "commons/Data.h"
 #include "splitting/SplittingRule.h"
 
-namespace grf
-{
+namespace grf {
 
-  class InstrumentalSplittingRule final : public SplittingRule
-  {
-  public:
-    InstrumentalSplittingRule(size_t max_num_unique_values,
-                              uint min_node_size,
-                              double alpha,
-                              double imbalance_penalty);
-    ~InstrumentalSplittingRule();
+class InstrumentalSplittingRule final: public SplittingRule {
+public:
+  InstrumentalSplittingRule(size_t max_num_unique_values,
+                            uint min_node_size,
+                            double alpha,
+                            double imbalance_penalty);
+  ~InstrumentalSplittingRule();
 
-    bool find_best_split(const Data &data,
-                         size_t node,
-                         const std::vector<size_t> &possible_split_vars,
-                         const Eigen::ArrayXXd &responses_by_sample,
-                         const std::vector<std::vector<size_t>> &samples,
-                         std::vector<size_t> &split_vars,
-                         std::vector<double> &split_values,
-                         std::vector<bool> &send_missing_left);
+  bool find_best_split(const Data& data,
+                       size_t node,
+                       const std::vector<size_t>& possible_split_vars,
+                       const std::vector<double>& responses_by_sample,
+                       const std::vector<std::vector<size_t>>& samples,
+                       std::vector<size_t>& split_vars,
+                       std::vector<double>& split_values,
+                       std::vector<bool>& send_missing_left);
 
-  private:
-    void find_best_split_value(const Data &data,
-                               size_t node,
-                               size_t var,
-                               size_t num_samples,
-                               double weight_sum_node,
-                               double sum_node,
-                               double mean_node_z,
-                               size_t num_node_small_z,
-                               double sum_node_w,
-                               double sum_node_w_squared,
-                               double min_child_size,
-                               double &best_value,
-                               size_t &best_var,
-                               double &best_decrease,
-                               bool &best_send_missing_left,
-                               const Eigen::ArrayXXd &responses_by_sample,
-                               const std::vector<std::vector<size_t>> &samples);
+private:
+  void find_best_split_value(const Data& data,
+                             size_t node,
+                             size_t var,
+                             size_t num_samples,
+                             double weight_sum_node,
+                             double sum_node,
+                             double mean_node_z,
+                             size_t num_node_small_z,
+                             double sum_node_w,
+                             double sum_node_w_squared,
+                             double min_child_size,
+                             double& best_value,
+                             size_t& best_var,
+                             double& best_decrease,
+                             bool& best_send_missing_left,
+                             const std::vector<double>& responses_by_sample,
+                             const std::vector<std::vector<size_t>>& samples);
 
-    size_t *counter;
-    double *weight_sums;
-    double *sums;
-    size_t *num_small_z;
-    double *sums_z;
-    double *sums_z_squared;
-    // Eigen::MatrixXf *target_avg_weights;
-    uint min_node_size;
-    double alpha;
-    double imbalance_penalty;
-    DISALLOW_COPY_AND_ASSIGN(InstrumentalSplittingRule);
-  };
+  size_t* counter;
+  double* weight_sums;
+  double* sums;
+  size_t* num_small_z;
+  double* sums_z;
+  double* sums_z_squared;
+
+  uint min_node_size;
+  double alpha;
+  double imbalance_penalty;
+
+  DISALLOW_COPY_AND_ASSIGN(InstrumentalSplittingRule);
+};
 
 } // namespace grf
 
