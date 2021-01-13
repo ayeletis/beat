@@ -115,10 +115,12 @@ Update Local Repo ( in the Repo root folder)
 
 This method may speed up build time as not all files are recompiled. 
 ```
-git fetch --all
-Use Rstudio to open it as a project. Or double click 'grf.Rproj'
-Click Build --> Install and Restart
+git fetch --all 
 ```
+Or you may double click grf/r-package/grf/grf.Rproj --> Tools --> Version Control--> Pull Branches
+
+Click Build --> Install and Restart
+
 
 Clean Build and all files are compiled. 
 ```
