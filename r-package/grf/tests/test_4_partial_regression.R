@@ -90,22 +90,21 @@ time1 = Sys.time()
 fit_grf <- regression_forest(X_train, Y_train,
                          honesty = TRUE,
                          num.trees = num_trees,
-                         # num.threads=1,
-                         #tune.parameters='all',
+                         tune.parameters='all',
                          seed=1
 )
 print(Sys.time() - time1)
+fit_grf$tuning.output
 
 time1 = Sys.time()
 fit_grf_v2 <- balanced_regression_forest(X_train, Y_train,
                             target.weights = as.matrix(Z_train),
-                            target.weight.penalty = 3,
+                            target.weight.penalty = 2,
                             target.weight.standardize = TRUE,
-                            # target.weights.hat = 0,
                             target.weight.bins.breaks = 256,
                             honesty = TRUE,
                             num.trees = num_trees, #10, #num_trees,
-                            #tune.parameters = "all",
+                            tune.parameters = "all",
                             # num.threads = 1,
                             seed=1
 )

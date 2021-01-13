@@ -18,7 +18,7 @@ relu <- function(x) {
 n1 <- 5000
 # calibration
 n2 <- 1000
-num_trees <-  4000
+num_trees <-  400
 # validation
 p_continuous <- 4
 p_discrete <- 1
@@ -130,22 +130,20 @@ time1 = Sys.time()
 fit_grf <- causal_forest(X_train, Y_train, W_train,
                          honesty = TRUE,
                          num.trees = num_trees,
-                         # num.threads=1,
                          tune.parameters='all',
                          seed=1
 )
 print(Sys.time() - time1)
-
+fit_grf$tuning.output
 time1 = Sys.time()
 fit_grf_v2 <- balanced_causal_forest(X_train, Y_train, W_train,
                             target.weights = as.matrix(Z_train),
                             target.weight.penalty = 10,
                             target.weight.standardize = TRUE,
-                            # target.weights.hat = 0,
                             target.weight.bins.breaks = 256,
                             honesty = TRUE,
                             num.trees = num_trees, #10, #num_trees,
-                            # tune.parameters = "all",
+                            tune.parameters = "all",
                             # num.threads = 1,
                             seed=1
 )

@@ -1,6 +1,41 @@
 # generalized random forests <a href='https://grf-labs.github.io/grf/'><img src='https://raw.githubusercontent.com/grf-labs/grf/master/images/logo/grf_logo_wbg_cropped.png' align="right" height="120" /></a>
 
 Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
+
+## Sample Usage
+
+Dimensions:
+
+X_train: [N, N_x]
+
+Y_train: [N, 1]
+
+Z_train: [N, N_z]
+
+```
+balanced_regression_forest(X_train, Y_train,
+                            target.weights = as.matrix(Z_train),
+                            target.weight.penalty = 2,
+                            target.weight.standardize = TRUE,
+                            target.weight.bins.breaks = 256,
+                            honesty = TRUE,
+                            num.trees = num_trees, 
+                            tune.parameters = "all", # include tunning `target.weight.penalty`
+                            seed=1)
+
+
+balanced_causal_forest(X_train, Y_train, W_train,
+                        target.weights = as.matrix(Z_train),
+                        target.weight.penalty = 10,
+                        target.weight.standardize = TRUE,
+                        target.weight.bins.breaks = 256,
+                        honesty = TRUE,
+                        num.trees = num_trees, 
+                        tune.parameters = "all",
+                        seed=1                        
+```
+
+
 ## Highlights:
 * Original package use symbolic links for all C++ codes, but Windows users may fail to build it from source. All C++ code locations are  re-arranged. 
 * Add  target weight penalty in `regression_forest` and `causual forest`
@@ -87,6 +122,7 @@ R/tuning_balanced.R
 R/tune_casual_forest.R
 R/tune_regression_forest.R
 R/input_utilities.R
+R/print.R
 src/BalancedCausalForestBindings.cpp
 src/BalancedRegressionForestBindings.cpp
 src/forest/ForestTrainers.h

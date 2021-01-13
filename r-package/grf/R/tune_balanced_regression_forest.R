@@ -109,7 +109,7 @@ tune_balanced_regression_forest <- function(X, Y,
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty","target.weight.penalty")
 
   if( is.null(target.avg.weights) || max(sapply(target.avg.weights, function(x) max(abs(x))))  == 0  ){
     all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']

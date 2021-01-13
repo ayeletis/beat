@@ -116,7 +116,7 @@ balanced_regression_forest <- function(X, Y,
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   stopifnot(target.weight.penalty>=0)
-  stopifnot(ncol(target.weights) == ncol(X))
+  stopifnot(nrow(target.weights) == nrow(X))
 
   # target weight
   if(!is.null(target.weights)){
