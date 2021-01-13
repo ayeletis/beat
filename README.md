@@ -79,7 +79,30 @@ X is uniformly distributed from [0, 1]
 
 ![img](images/target_weight_penalty_gamma_dist.png)  
 
+## Files Change Log
+```
+R/balanced_casual_forest.R
+R/balanced_regression_forest.R
+R/tuning_balanced.R
+R/tune_casual_forest.R
+R/tune_regression_forest.R
+R/input_utilities.R
+src/BalancedCausalForestBindings.cpp
+src/BalancedRegressionForestBindings.cpp
+src/forest/ForestTrainers.h
+src/forest/ForestTrainers.cpp
+src/splitting/factory/BalancedRegressionSplittingRuleFactory.h
+src/splitting/factory/BalancedRegressionSplittingRuleFactory.cpp
+src/splitting/factory/BalancedInstrumentalSplittingRulesFactory.h
+src/splitting/factory/BalancedInstrumentalSplittingRulesFactory.cpp
+src/splitting/BalancedRegressionSplittingRule.h
+src/splitting/BalancedRegressionSplittingRule.cpp
+src/splitting/BalancedInstrumentalSplittingRules.h
+src/splitting/BalancedInstrumentalSplittingRules.cpp
+src/commons/Data.cpp
+src/commons/Data.h
 
+```
 
 ## Potential Problems:
 * Curse of dimensionality?
@@ -87,6 +110,17 @@ X is uniformly distributed from [0, 1]
   - But increasing dimensions of target weight to 50 seems have no impact.
 * Need to figure out when causal forest use instrument or regression splitting rules.
 ## Build From Source:
+
+Update Local Repo ( in the Repo root folder)
+
+This method may speed up build time as not all files are recompiled. 
+```
+git fetch --all
+Use Rstudio to open it as a project. Or double click 'grf.Rproj'
+Click Build --> Install and Restart
+```
+
+Clean Build and all files are compiled. 
 ```
 git clone https://github.com/yu45020/grf
 cd grf/r-package/grf

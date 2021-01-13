@@ -23,9 +23,9 @@ namespace grf
 {
 
     BalancedRegressionSplittingRule::BalancedRegressionSplittingRule(size_t max_num_unique_values,
-                                                     double alpha,
-                                                     double imbalance_penalty) : alpha(alpha),
-                                                                                 imbalance_penalty(imbalance_penalty)
+                                                                     double alpha,
+                                                                     double imbalance_penalty) : alpha(alpha),
+                                                                                                 imbalance_penalty(imbalance_penalty)
     {
         this->counter = new size_t[max_num_unique_values];
         this->sums = new double[max_num_unique_values];
@@ -49,14 +49,15 @@ namespace grf
     }
 
     bool BalancedRegressionSplittingRule::find_best_split(const Data &data,
-                                                  size_t node,
-                                                  const std::vector<size_t> &possible_split_vars,
-                                                  const Eigen::ArrayXXd &responses_by_sample,
-                                                  const std::vector<std::vector<size_t>> &samples,
-                                                  std::vector<size_t> &split_vars,
-                                                  std::vector<double> &split_values,
-                                                  std::vector<bool> &send_missing_left)
+                                                          size_t node,
+                                                          const std::vector<size_t> &possible_split_vars,
+                                                          const Eigen::ArrayXXd &responses_by_sample,
+                                                          const std::vector<std::vector<size_t>> &samples,
+                                                          std::vector<size_t> &split_vars,
+                                                          std::vector<double> &split_values,
+                                                          std::vector<bool> &send_missing_left)
     {
+        size_t num_samples = samples[node].size();
         // std::cout << "Regression split \n";
         size_t size_node = samples[node].size();
         size_t min_child_size = std::max<size_t>(std::ceil(size_node * alpha), 1uL);
@@ -80,7 +81,7 @@ namespace grf
         // For all possible split variables
         for (auto &var : possible_split_vars)
         {
-            find_best_split_value(data, node, var, weight_sum_node, sum_node, size_node, min_child_size,
+            find_best_split_value(data, node, var, num_samples, weight_sum_node, sum_node, size_node, min_child_size,
                                   best_value, best_var, best_decrease, best_send_missing_left, responses_by_sample,
                                   samples);
         }
@@ -99,15 +100,16 @@ namespace grf
     }
 
     void BalancedRegressionSplittingRule::find_best_split_value(const Data &data,
-                                                        size_t node, size_t var,
-                                                        double weight_sum_node,
-                                                        double sum_node,
-                                                        size_t size_node,
-                                                        size_t min_child_size,
-                                                        double &best_value, size_t &best_var,
-                                                        double &best_decrease, bool &best_send_missing_left,
-                                                        const Eigen::ArrayXXd &responses_by_sample,
-                                                        const std::vector<std::vector<size_t>> &samples)
+                                                                size_t node, size_t var,
+                                                                size_t num_samples,
+                                                                double weight_sum_node,
+                                                                double sum_node,
+                                                                size_t size_node,
+                                                                size_t min_child_size,
+                                                                double &best_value, size_t &best_var,
+                                                                double &best_decrease, bool &best_send_missing_left,
+                                                                const Eigen::ArrayXXd &responses_by_sample,
+                                                                const std::vector<std::vector<size_t>> &samples)
     {
         // sorted_samples: the node samples in increasing order (may contain duplicated Xij). Length: size_node
         std::vector<double> possible_split_values;
@@ -130,6 +132,17 @@ namespace grf
         double weight_sum_missing = 0;
         double sum_missing = 0;
 
+        // target weight penalty
+        double target_weight_penalty_rate = data.get_target_weight_penalty();
+        Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var];
+        Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
+        if (target_weight_penalty_rate > 0)
+        {
+            for (size_t i = 0; i < num_samples; i++)
+            {
+                target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
+            }
+        }
         // Fill counter and sums buckets
         // used to store each split
         size_t split_index = 0;
@@ -213,13 +226,29 @@ namespace grf
 
                 double weight_sum_right = weight_sum_node - weight_sum_left;
                 double sum_right = sum_node - sum_left;
-                double decrease = sum_left * sum_left / weight_sum_left + sum_right * sum_right / weight_sum_right;
+
+                // Calculate the decrease in impurity.
+                double decrease_left = sum_left * sum_left / weight_sum_left;
+                double decrease_right = sum_right * sum_right / weight_sum_right;
+                double decrease = decrease_left + decrease_right;
+
+                // double decrease = sum_left * sum_left / weight_sum_left + sum_right * sum_right / weight_sum_right;
 
                 // Penalize splits that are too close to the edges of the data.
                 double penalty = imbalance_penalty * (1.0 / n_left + 1.0 / n_right);
                 decrease -= penalty;
-              
-              
+
+                // penalize splits by target weights
+                if (target_weight_penalty_rate > 0)
+                {
+                    Eigen::VectorXd left_target_avg_weight = target_avg_weights_sorted.topRows(n_left).colwise().mean();
+                    Eigen::VectorXd right_target_avg_weight = target_avg_weights_sorted.bottomRows(n_right).colwise().mean();
+
+                    double penalty_target_weight = left_target_avg_weight.lpNorm<2>() * decrease_left + right_target_avg_weight.lpNorm<2>() * decrease_right; /// weight_sum_left   / weight_sum_right
+                    // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
+                    decrease -= penalty_target_weight * target_weight_penalty_rate;
+                }
+
                 if (decrease > best_decrease)
                 {
 

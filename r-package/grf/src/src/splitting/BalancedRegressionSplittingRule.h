@@ -22,51 +22,53 @@
 #include "splitting/SplittingRule.h"
 #include "tree/Tree.h"
 
-namespace grf {
+namespace grf
+{
 
-class BalancedRegressionSplittingRule final: public SplittingRule {
-public:
-  BalancedRegressionSplittingRule(size_t max_num_unique_values,
-                          double alpha,
-                          double imbalance_penalty);
+  class BalancedRegressionSplittingRule final : public SplittingRule
+  {
+  public:
+    BalancedRegressionSplittingRule(size_t max_num_unique_values,
+                                    double alpha,
+                                    double imbalance_penalty);
 
-  ~BalancedRegressionSplittingRule();
+    ~BalancedRegressionSplittingRule();
 
-  bool find_best_split(const Data& data,
-                       size_t node,
-                       const std::vector<size_t>& possible_split_vars,
-                       const Eigen::ArrayXXd& responses_by_sample,
-                       const std::vector<std::vector<size_t>>& samples,
-                       std::vector<size_t>& split_vars,
-                       std::vector<double>& split_values,
-                       std::vector<bool>& send_missing_left);
+    bool find_best_split(const Data &data,
+                         size_t node,
+                         const std::vector<size_t> &possible_split_vars,
+                         const Eigen::ArrayXXd &responses_by_sample,
+                         const std::vector<std::vector<size_t>> &samples,
+                         std::vector<size_t> &split_vars,
+                         std::vector<double> &split_values,
+                         std::vector<bool> &send_missing_left);
 
-private:
-  void find_best_split_value(const Data& data,
-                             size_t node,
-                             size_t var,
-                             double weight_sum_node,
-                             double sum_node,
-                             size_t size_node,
-                             size_t min_child_size,
-                             double& best_value,
-                             size_t& best_var,
-                             double& best_decrease,
-                             bool& best_send_missing_left,
-                             const Eigen::ArrayXXd& responses_by_sample,
-                             const std::vector<std::vector<size_t>>& samples);
+  private:
+    void find_best_split_value(const Data &data,
+                               size_t node,
+                               size_t var,
+                               size_t num_samples,
+                               double weight_sum_node,
+                               double sum_node,
+                               size_t size_node,
+                               size_t min_child_size,
+                               double &best_value,
+                               size_t &best_var,
+                               double &best_decrease,
+                               bool &best_send_missing_left,
+                               const Eigen::ArrayXXd &responses_by_sample,
+                               const std::vector<std::vector<size_t>> &samples);
 
-  size_t* counter;
-  double* sums;
-  double* weight_sums;
+    size_t *counter;
+    double *sums;
+    double *weight_sums;
 
-  double alpha;
-  double imbalance_penalty;
-  double* target_left_weights;
+    double alpha;
+    double imbalance_penalty;
+    double *target_left_weights;
 
-
-  DISALLOW_COPY_AND_ASSIGN(BalancedRegressionSplittingRule);
-};
+    DISALLOW_COPY_AND_ASSIGN(BalancedRegressionSplittingRule);
+  };
 
 } // namespace grf
 

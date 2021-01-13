@@ -308,3 +308,49 @@ validate_subset <- function(forest, subset) {
   }
   subset
 }
+
+
+standardize = function(x){
+  if(length(unique(x))==1){
+    return( scale(x, center=TRUE, scale=FALSE))
+  }else{
+    return(scale(x, center=TRUE, scale=TRUE))
+  }
+}
+
+construct_target_weight_mean = function(x, z, num_breaks = 256) {
+  calculate_avg = function(dat, x_col, z_col, num_breaks) {
+    df = dat[, .SD, .SDcols = c(x_col, z_col)]
+    df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
+    # if(isTRUE(demean)){
+    #   df[, (z_col) := get(z_col) - mean(get(z_col))]
+    # }
+    df[, mean_value := mean(get(z_col)), by = cut_bins]
+    out = df[, mean_value]
+    # out = df[, mean_value] # if z is orthogonal (z hat)
+    # if(isTRUE(demean)){
+    #   out = df[, mean_value - mean(mean_value)]
+    # }else{
+    #   out = df[, mean_value]
+    # }
+    return(out)
+  }
+
+  stopifnot(is.matrix(z))
+  stopifnot(dim(x)[1] == dim(z)[1])
+  dat = as.data.table(x)
+  x_cols = paste0('x_', 1:dim(x)[2])
+  names(dat) = x_cols
+  dat_z = as.data.table(z)
+  z_cols = paste0("z_", 1:dim(z)[2])
+  names(dat_z) = z_cols
+  dat = cbind(dat, dat_z)
+  # output matrix: 3D [var, n, z]
+  out = vector('list', length = length(x_cols))
+  for (i in 1:length(x_cols)) {
+    out[[i]] = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
+  }
+
+  return(out)
+}
+

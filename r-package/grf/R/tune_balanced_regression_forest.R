@@ -1,13 +1,10 @@
-#' Balanced Causal forest tuning
+#' Balanced Regression forest tuning
 #'
+#' Trains a regression forest that can be used to estimate
+#' the conditional mean function mu(x) = E[Y | X = x]
 #'
 #' @param X The covariates used in the regression.
 #' @param Y The outcome.
-#' @param W The treatment assignment (may be binary or real).
-#' @param Y.hat Estimates of the expected responses E[Y | Xi], marginalizing
-#'              over treatment. See section 6.1.1 of the GRF paper for
-#'              further discussion of this quantity.
-#' @param W.hat Estimates of the treatment propensities E[W | Xi].
 #' @param sample.weights Weights given to an observation in estimation.
 #'                       If NULL, each observation is given the same weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
@@ -43,8 +40,6 @@
 #'  Only applies if honesty is enabled. Default is TRUE.
 #' @param alpha A tuning parameter that controls the maximum imbalance of a split. Default is 0.05.
 #' @param imbalance.penalty A tuning parameter that controls how harshly imbalanced splits are penalized. Default is 0.
-#' @param stabilize.splits Whether or not the treatment should be taken into account when
-#'                         determining the imbalance of a split. Default is TRUE.
 #' @param ci.group.size The forest will grow ci.group.size trees on each subsample.
 #'                      In order to provide confidence intervals, ci.group.size must
 #'                      be at least 2. Default is 2.
@@ -70,15 +65,12 @@
 #' n <- 500
 #' p <- 10
 #' X <- matrix(rnorm(n * p), n, p)
-#' W <- rbinom(n, 1, 0.5)
-#' Y <- pmax(X[, 1], 0) * W + X[, 2] + pmin(X[, 3], 0) + rnorm(n)
-#' Y.hat <- predict(regression_forest(X, Y))$predictions
-#' W.hat <- rep(0.5, n)
-#' params <- tune_causal_forest(X, Y, W, Y.hat, W.hat)$params
+#' Y <- X[, 1] * rnorm(n)
+#' params <- tune_regression_forest(X, Y)$params
 #'
 #' # Use these parameters to train a regression forest.
-#' tuned.forest <- causal_forest(X, Y, W,
-#'   Y.hat = Y.hat, W.hat = W.hat, num.trees = 1000,
+#' tuned.forest <- regression_forest(X, Y,
+#'   num.trees = 1000,
 #'   min.node.size = as.numeric(params["min.node.size"]),
 #'   sample.fraction = as.numeric(params["sample.fraction"]),
 #'   mtry = as.numeric(params["mtry"]),
@@ -88,42 +80,41 @@
 #' }
 #'
 #' @export
-tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
-                              sample.weights = NULL,
-                              clusters = NULL,
-                              equalize.cluster.weights = FALSE,
-                              sample.fraction = 0.5,
-                              mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
-                              min.node.size = 5,
-                              honesty = TRUE,
-                              honesty.fraction = 0.5,
-                              honesty.prune.leaves = TRUE,
-                              alpha = 0.05,
-                              imbalance.penalty = 0,
-                              stabilize.splits = TRUE,
-                              ci.group.size = 2,
-                              tune.parameters = "all",
-                              tune.num.trees = 200,
-                              tune.num.reps = 50,
-                              tune.num.draws = 1000,
-                              num.threads = NULL,
-                              seed = runif(1, 0, .Machine$integer.max),
-                              target.avg.weights=NULL,
-                              target.weight.penalty=0) {
+tune_balanced_regression_forest <- function(X, Y,
+                                  sample.weights = NULL,
+                                  clusters = NULL,
+                                  equalize.cluster.weights = FALSE,
+                                  sample.fraction = 0.5,
+                                  mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                                  min.node.size = 5,
+                                  honesty = TRUE,
+                                  honesty.fraction = 0.5,
+                                  honesty.prune.leaves = TRUE,
+                                  alpha = 0.05,
+                                  imbalance.penalty = 0,
+                                  ci.group.size = 2,
+                                  tune.parameters = "all",
+                                  tune.num.trees = 50,
+                                  tune.num.reps = 100,
+                                  tune.num.draws = 1000,
+                                  num.threads = NULL,
+                                  seed = runif(1, 0, .Machine$integer.max),
+                                  target.avg.weights=NULL,
+                                  target.weight.penalty=0) {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
-  W <- validate_observations(W, X)
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty")
 
   if( is.null(target.avg.weights) || max(sapply(target.avg.weights, function(x) max(abs(x))))  == 0  ){
     all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
   }
+
 
   default.parameters <- list(sample.fraction = 0.5,
                              mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
@@ -144,9 +135,8 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                             imbalance.penalty = imbalance.penalty,
                             target.weight.penalty=target.weight.penalty )
 
-  Y.centered <- Y - Y.hat
-  W.centered <- W - W.hat
-  data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered, sample.weights = sample.weights)
+
+  data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
   nrow.X <- nrow(X)
   ncol.X <- ncol(X)
   args <- list(clusters = clusters,
@@ -158,14 +148,14 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                honesty.fraction = honesty.fraction,
                honesty.prune.leaves = honesty.prune.leaves,
                alpha = alpha,
-               stabilize.splits = stabilize.splits,
                imbalance.penalty = imbalance.penalty,
                ci.group.size = ci.group.size,
                num.threads = num.threads,
                seed = seed,
-               reduced.form.weight = 0,
                target.avg.weights=target.avg.weights,
                target.weight.penalty=target.weight.penalty)
+
+
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params
@@ -179,7 +169,7 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   tune.parameters.defaults <- default.parameters[tune.parameters]
   tune.parameters.userinput <- userinput.parameters[tune.parameters]
 
-  train <- balanced_causal_train
+  train <- balanced_regression_train
 
   tuning.output <- tune_balanced_forest(data = data,
                                         nrow.X = nrow.X,

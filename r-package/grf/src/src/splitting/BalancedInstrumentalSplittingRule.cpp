@@ -24,11 +24,11 @@ namespace grf
 {
 
   BalancedInstrumentalSplittingRule::BalancedInstrumentalSplittingRule(size_t max_num_unique_values,
-                                                       uint min_node_size,
-                                                       double alpha,
-                                                       double imbalance_penalty) : min_node_size(min_node_size),
-                                                                                   alpha(alpha),
-                                                                                   imbalance_penalty(imbalance_penalty)
+                                                                       uint min_node_size,
+                                                                       double alpha,
+                                                                       double imbalance_penalty) : min_node_size(min_node_size),
+                                                                                                   alpha(alpha),
+                                                                                                   imbalance_penalty(imbalance_penalty)
   {
     this->counter = new size_t[max_num_unique_values];
     this->weight_sums = new double[max_num_unique_values];
@@ -36,7 +36,6 @@ namespace grf
     this->num_small_z = new size_t[max_num_unique_values];
     this->sums_z = new double[max_num_unique_values];
     this->sums_z_squared = new double[max_num_unique_values];
-    // this->target_avg_weights = new Eigen::MatrixXf ;
   }
 
   BalancedInstrumentalSplittingRule::~BalancedInstrumentalSplittingRule()
@@ -65,20 +64,17 @@ namespace grf
     {
       delete[] num_small_z;
     }
-    // if (target_avg_weights != nullptr)
-    // {
-    //   delete target_avg_weights;
-    // }
+
   }
 
   bool BalancedInstrumentalSplittingRule::find_best_split(const Data &data,
-                                                  size_t node,
-                                                  const std::vector<size_t> &possible_split_vars,
-                                                  const Eigen::ArrayXXd &responses_by_sample,
-                                                  const std::vector<std::vector<size_t>> &samples,
-                                                  std::vector<size_t> &split_vars,
-                                                  std::vector<double> &split_values,
-                                                  std::vector<bool> &send_missing_left)
+                                                          size_t node,
+                                                          const std::vector<size_t> &possible_split_vars,
+                                                          const Eigen::ArrayXXd &responses_by_sample,
+                                                          const std::vector<std::vector<size_t>> &samples,
+                                                          std::vector<size_t> &split_vars,
+                                                          std::vector<double> &split_values,
+                                                          std::vector<bool> &send_missing_left)
   {
     size_t num_samples = samples[node].size();
     // std::cout << "Instrument split \n";
@@ -140,21 +136,21 @@ namespace grf
   }
 
   void BalancedInstrumentalSplittingRule::find_best_split_value(const Data &data,
-                                                        size_t node, size_t var,
-                                                        size_t num_samples,
-                                                        double weight_sum_node,
-                                                        double sum_node,
-                                                        double mean_node_z,
-                                                        size_t num_node_small_z,
-                                                        double sum_node_z,
-                                                        double sum_node_z_squared,
-                                                        double min_child_size,
-                                                        double &best_value,
-                                                        size_t &best_var,
-                                                        double &best_decrease,
-                                                        bool &best_send_missing_left,
-                                                        const Eigen::ArrayXXd &responses_by_sample,
-                                                        const std::vector<std::vector<size_t>> &samples)
+                                                                size_t node, size_t var,
+                                                                size_t num_samples,
+                                                                double weight_sum_node,
+                                                                double sum_node,
+                                                                double mean_node_z,
+                                                                size_t num_node_small_z,
+                                                                double sum_node_z,
+                                                                double sum_node_z_squared,
+                                                                double min_child_size,
+                                                                double &best_value,
+                                                                size_t &best_var,
+                                                                double &best_decrease,
+                                                                bool &best_send_missing_left,
+                                                                const Eigen::ArrayXXd &responses_by_sample,
+                                                                const std::vector<std::vector<size_t>> &samples)
   {
     std::vector<double> possible_split_values;
     std::vector<size_t> sorted_samples;
@@ -183,20 +179,19 @@ namespace grf
     size_t num_small_z_missing = 0;
 
     // target weight penalty
-    double target_weight_penalty = data.get_target_weight_penalty();
+    double target_weight_penalty_rate = data.get_target_weight_penalty();
     Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var]; //data.get_target_avg_weights(var);
 
     Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
 
-    if (target_weight_penalty > 0)
+    if (target_weight_penalty_rate > 0)
     {
       for (size_t i = 0; i < num_samples; i++)
       {
         target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
       }
-     
     }
-    // std::cout << "var: " << var << "; penalty:" << target_weight_penalty << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
+    // std::cout << "var: " << var << "; penalty:" << target_weight_penalty_rate << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
 
     size_t split_index = 0;
     for (size_t i = 0; i < num_samples - 1; i++)
@@ -330,14 +325,16 @@ namespace grf
         double decrease = decrease_left + decrease_right;
         // Penalize splits that are too close to the edges of the data.
         decrease -= imbalance_penalty * (1.0 / size_left + 1.0 / size_right);
-        if (target_weight_penalty > 0)
+        
+        // penalize splits by target weights 
+        if (target_weight_penalty_rate > 0)
         {
           Eigen::VectorXd left_target_avg_weight = target_avg_weights_sorted.topRows(n_left).colwise().mean();
           Eigen::VectorXd right_target_avg_weight = target_avg_weights_sorted.bottomRows(n_right).colwise().mean();
 
           double penalty_target_weight = left_target_avg_weight.lpNorm<2>() * decrease_left + right_target_avg_weight.lpNorm<2>() * decrease_right; /// weight_sum_left   / weight_sum_right
           // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-          decrease -= penalty_target_weight * target_weight_penalty;
+          decrease -= penalty_target_weight * target_weight_penalty_rate;
         }
 
         // Save this split if it is the best seen so far.

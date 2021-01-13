@@ -129,9 +129,6 @@ if (FALSE) {
 time1 = Sys.time()
 fit_grf <- causal_forest(X_train, Y_train, W_train,
                          honesty = TRUE,
-                         #Y.hat = 0, W.hat=0,
-                         #target.weights = as.matrix(Z_train) ,
-                         target.weight.penalty=0,
                          num.trees = num_trees,
                          # num.threads=1,
                          tune.parameters='all',
@@ -140,21 +137,21 @@ fit_grf <- causal_forest(X_train, Y_train, W_train,
 print(Sys.time() - time1)
 
 time1 = Sys.time()
-fit_grf_v2 <- causal_forest(X_train, Y_train, W_train,
+fit_grf_v2 <- balanced_causal_forest(X_train, Y_train, W_train,
                             target.weights = as.matrix(Z_train),
-                            target.weight.penalty = 0,
+                            target.weight.penalty = 10,
                             target.weight.standardize = TRUE,
                             # target.weights.hat = 0,
                             target.weight.bins.breaks = 256,
                             honesty = TRUE,
                             num.trees = num_trees, #10, #num_trees,
-                            tune.parameters = "all",
+                            # tune.parameters = "all",
                             # num.threads = 1,
                             seed=1
 )
 print(Sys.time() - time1)
 
-
+fit_grf_v2$tuning.output
 
 tau_train.grf <- predict(fit_grf, estimate.variance = TRUE) # newdata=X_validate,
 tau.pred <- tau_train.grf$predictions
@@ -237,5 +234,6 @@ ggline(dat_pred, x='x',
   geom_line(mapping = aes(x = x, y = tau.true), color = "purple") +
   geom_line(mapping = aes(x = x, y = tau.pred.upper, color = tau.type), linetype='dashed') +
   geom_line(mapping = aes(x = x, y = tau.pred.lower, color = tau.type), linetype='dashed')
+
 ggsave("tau_x_weight_10.png", width=14, height=8)
 
