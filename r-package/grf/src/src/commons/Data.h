@@ -68,6 +68,7 @@ namespace grf
 
     void set_target_weight_penalty(double target_weight_penalty);
 
+    void set_target_weight_penalty_metric(std::string metric_type);
     /**
    * Sorts and gets the unique values in `samples` at variable `var`.
    *
@@ -112,10 +113,10 @@ namespace grf
 
     double get_target_weight_penalty() const;
 
-    // size_t get_target_weight_ncols() const;
-    double target_weight_penalty;
+    std::string get_target_weight_penalty_metric() const; 
 
-    // Rcpp::List target_avg_weights;
+    double target_weight_penalty;
+    std::string target_weight_penalty_metric;
 
     std::vector<Eigen::MatrixXd> target_avg_weights;
 

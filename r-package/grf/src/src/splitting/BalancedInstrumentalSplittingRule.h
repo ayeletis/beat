@@ -29,9 +29,9 @@ namespace grf
   {
   public:
     BalancedInstrumentalSplittingRule(size_t max_num_unique_values,
-                              uint min_node_size,
-                              double alpha,
-                              double imbalance_penalty);
+                                      uint min_node_size,
+                                      double alpha,
+                                      double imbalance_penalty);
     ~BalancedInstrumentalSplittingRule();
 
     bool find_best_split(const Data &data,
@@ -42,6 +42,15 @@ namespace grf
                          std::vector<size_t> &split_vars,
                          std::vector<double> &split_values,
                          std::vector<bool> &send_missing_left);
+
+    double calculate_target_weight_penalty(double penalty_rate,
+                                           double decrease_left,
+                                           double decrease_right,
+                                           Eigen::VectorXd target_weight_avg_left,
+                                           Eigen::VectorXd target_weight_avg_right,
+                                           std::string target_weight_penalty_metric
+
+    );
 
   private:
     void find_best_split_value(const Data &data,

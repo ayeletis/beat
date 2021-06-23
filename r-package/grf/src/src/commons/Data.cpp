@@ -218,33 +218,15 @@ namespace grf
 
   void Data::set_target_avg_weights(Rcpp::List x)
   {
-    // Rcpp::Rcout << "Inside Setting weights done \n";
 
     std::vector<Eigen::MatrixXd> out(x.size());
-    // Rcpp::Rcout << "matrix size: " << x.size() << "\n";
+
     for (int i; i < x.size(); i++)
     {
-      // Rcpp::Rcout << "iteration: " << i << "\n";
-
       Rcpp::NumericMatrix M = x[i];
-      // Rcpp::Rcout << "matrix rows: " << M.rows() << "\n";
       Eigen::MatrixXd MS = Rcpp::as<Eigen::MatrixXd>(M);
-      // Rcpp::Rcout << "MS sum: " << MS.sum() << "\n";
-      // out[i] = Rcpp::as<Eigen::MatrixXf>(M);
 
-      // Eigen::MatrixXd MS(M.rows(), M.cols());
-
-      // for (double j; j < M.rows(); j++)
-      // {
-      //   for (double k; k < M.cols(); k++)
-      //   {
-      //     MS(j, k) = M(j, k);
-      //     // Rcpp::Rcout << "matrix value: " << MS(j, k) << "\n";
-      //     // Rcpp::Rcout << "count: " << j << "-" << k << "\n";
-      //   }
-      // }
       out[i] = MS;
-      // Rcpp::Rcout << "out sum: " << out[i].sum() << "MS:" << MS.sum() << "\n";
     }
     this->target_avg_weights = out;
   }
@@ -253,6 +235,13 @@ namespace grf
   {
     this->target_weight_penalty = target_weight_penalty;
   }
+
+  void Data::set_target_weight_penalty_metric(std::string metric_type)
+  {
+    this->target_weight_penalty_metric = metric_type;
+  }
+
+  //----  get methods start from here -----
   void Data::get_all_values(std::vector<double> &all_values,
                             std::vector<size_t> &sorted_samples,
                             const std::vector<size_t> &samples,
@@ -274,9 +263,8 @@ namespace grf
     // stable sort is needed for consistent element ordering cross platform,
     // otherwise the resulting sums used in the splitting rules may compound rounding error
     // differently and produce different splits.
-    std::stable_sort(index.begin(), index.end(), [&](const size_t &lhs, const size_t &rhs) {
-      return all_values[lhs] < all_values[rhs] || (std::isnan(all_values[lhs]) && !std::isnan(all_values[rhs]));
-    });
+    std::stable_sort(index.begin(), index.end(), [&](const size_t &lhs, const size_t &rhs)
+                     { return all_values[lhs] < all_values[rhs] || (std::isnan(all_values[lhs]) && !std::isnan(all_values[rhs])); });
 
     for (size_t i = 0; i < samples.size(); i++)
     {
@@ -284,9 +272,8 @@ namespace grf
       all_values[i] = get(sorted_samples[i], var);
     }
 
-    all_values.erase(unique(all_values.begin(), all_values.end(), [&](const double &lhs, const double &rhs) {
-                       return lhs == rhs || (std::isnan(lhs) && std::isnan(rhs));
-                     }),
+    all_values.erase(unique(all_values.begin(), all_values.end(), [&](const double &lhs, const double &rhs)
+                            { return lhs == rhs || (std::isnan(lhs) && std::isnan(rhs)); }),
                      all_values.end());
   }
 
@@ -384,6 +371,12 @@ namespace grf
   {
     return target_weight_penalty;
   }
+
+  std::string Data::get_target_weight_penalty_metric() const
+  {
+    return target_weight_penalty_metric;
+  }
+
   // size_t Data::get_target_weight_ncols() const
   // {
   //   Rcpp::NumericMatrix out = target_avg_weights[0];

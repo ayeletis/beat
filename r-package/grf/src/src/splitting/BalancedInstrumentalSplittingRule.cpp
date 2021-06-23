@@ -64,7 +64,6 @@ namespace grf
     {
       delete[] num_small_z;
     }
-
   }
 
   bool BalancedInstrumentalSplittingRule::find_best_split(const Data &data,
@@ -191,6 +190,10 @@ namespace grf
         target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
       }
     }
+    // cache: column-wise sum
+    Eigen::VectorXd target_weights_sum = target_avg_weights_sorted.colwise().sum();
+
+    std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
     // std::cout << "var: " << var << "; penalty:" << target_weight_penalty_rate << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
 
     size_t split_index = 0;
@@ -325,16 +328,24 @@ namespace grf
         double decrease = decrease_left + decrease_right;
         // Penalize splits that are too close to the edges of the data.
         decrease -= imbalance_penalty * (1.0 / size_left + 1.0 / size_right);
-        
-        // penalize splits by target weights 
+
+        // penalize splits by target weights
         if (target_weight_penalty_rate > 0)
         {
-          Eigen::VectorXd left_target_avg_weight = target_avg_weights_sorted.topRows(n_left).colwise().mean();
-          Eigen::VectorXd right_target_avg_weight = target_avg_weights_sorted.bottomRows(n_right).colwise().mean();
+          Eigen::VectorXd target_weights_sum_left = target_avg_weights_sorted.topRows(n_left).colwise().sum();
+          Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
 
-          double penalty_target_weight = left_target_avg_weight.lpNorm<2>() * decrease_left + right_target_avg_weight.lpNorm<2>() * decrease_right; /// weight_sum_left   / weight_sum_right
-          // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-          decrease -= penalty_target_weight * target_weight_penalty_rate;
+          Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
+          Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_left;
+
+          double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate,
+                                                                                   decrease_left = decrease_left,
+                                                                                   decrease_right = decrease_right,
+                                                                                   target_weights_avg_left = target_weights_avg_left,
+                                                                                   target_weights_avg_right = target_weights_avg_right,
+                                                                                   target_weight_penalty_metric = target_weight_penalty_metric);
+
+          decrease -= imbalance_target_weight_penalty;
         }
 
         // Save this split if it is the best seen so far.
@@ -349,5 +360,37 @@ namespace grf
       }
     }
   }
+
+  double calculate_target_weight_penalty(double penalty_rate,
+                                         double decrease_left,
+                                         double decrease_right,
+                                         Eigen::VectorXd target_weights_avg_left,
+                                         Eigen::VectorXd target_weights_avg_right,
+                                         std::string target_weight_penalty_metric)
+  {
+    double imbalance;
+    if (target_weight_penalty_metric == "rate_split_l2_norm")
+    {
+      // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
+      imbalance = target_weights_avg_left.lpNorm<2>() * decrease_left + target_weights_avg_right.lpNorm<2>() * decrease_right;
+    }
+    else if (target_weight_penalty_metric == "rate_euclidean_distance")
+    {
+      double imbalance = sqrt((target_weights_avg_left - target_weights_avg_right).pow(2).sum());
+    }
+    else if (target_weight_penalty_metric == "rate_cosine_similarity")
+    {
+      double upper = (target_weights_avg_left * target_weights_avg_right).sum();
+      double lower = sqrt(target_weights_avg_left.pow(2).sum()) * sqrt(target_weights_avg_right.pow(2).sum());
+      double cosine_similarity = upper / lower; //−1 = exactly opposite, 1 = exactly the same
+      imbalance = 1 - cosine_similarity;
+    }
+    else
+    { // the R wrapper function shall have filtered out
+      imbalance = 0;
+    }
+
+    return imbalance * penalty_rate;
+  };
 
 } // namespace grf
