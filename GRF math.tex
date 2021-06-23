@@ -1,0 +1,180 @@
+\documentclass[12pt,letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[margin=0.5in]{geometry}
+\usepackage[section]{placeins}
+%\FloatBarrier
+\usepackage{setspace}
+\onehalfspacing
+%opening
+\title{}
+\author{}
+\usepackage{float}
+\newcommand{\var}{\mathrm{Var }} 
+\begin{document}
+
+\title{Hand-Waving Derivation on Generalized Random Forest}
+\maketitle
+
+Reference: Athey, Tibshirani, and Wager (2018) Generalized Random Forest. 
+
+I  uses the proposition 1,2, and their proofs in the appendix. 
+
+\section{General Framework}
+The authors propose a general framework for Random Forest in two steps: relabeling and splitting. 
+
+In the relabeling step, we estimate a target function that minimizes the scoring function in a parent node level. In the splitting step, we loop over all columns of X  to find the best splitting point that minimize the mean square error between in sample and test sample estimation. 
+
+More specifically, suppose we have an input data $ X $, output $ O $, a scoring function $\varphi$, weights $ \alpha $, parameter in focus $\theta$, and optimal nuisance parameter $\nu$. We want to find $\hat{\theta}$ and $ \hat{\nu} $ that locally optimize the equation:  
+
+\begin{equation}\label{key}
+	E[\varphi_{\theta(x), \nu(x)}(O_{i})|X_{i}=x] = 0
+\end{equation}
+
+with the solution 
+\begin{equation}
+	(\hat{\theta}(x), \hat{\nu}(x)) \in  \underset{\theta, \nu}{argmin} \Big\{ \Vert    \sum_{i}^{n}\alpha_{i}\varphi_{\theta,\nu}(O_{i}) \Vert_{2}  \Big\}
+\end{equation}
+
+In regression trees, output $ O $ is $ Y $, but in instrument regression or causal inference, $ O $ is tuple $ (Y, W) $ where $ W $ is treatment assignment.
+
+Let $ P $ be a parent node, and $ J $ be a sample of data, $ X $ be a test set, $ C_{1} $ and $ C_{2} $  be children nodes, $ n_{C_j} $ be number of observations in node $ j $, $ X_p $ be center of mass in parent node , we want to minimize the equation:
+
+\begin{equation}\label{key}
+		err(C_1, C_2)   = \sum_{j=1,2}P(X \in C_{j} | X \in P) E[(\hat{\theta}(J) - \theta(X))^2] \\
+\end{equation}
+It's computational expensive to evaluate test sets during evaluating all possible splitting points. Instead, we use ``honest'' estimation (Athey and Imbens (2016)).   We split data into two sets.  One set is used to build trees, and the other set repopulate node values in the same trees. We then remove tree nodes if they are empty after repopulation (This step is more clear in the source code (function TreeTrainer::train) ).
+
+We proceed to derive splitting criteria. To use the same notations, $ X = J_{C_1} + J_{C_2} $. We expand the square and use the $ \var(X) = E(X^2) - [E[X]]^2 $:
+\begin{equation}
+	\begin{aligned}\label{error} 
+		err(C_1, C_2)  &  = \sum_{j=1,2} \dfrac{n_{c_j}}{n_p}[E(\hat{\theta}_{c_j}(J))^2 + E(\theta(X)^2) - 2E(\hat{\theta}(J)\theta(X)) ] \\
+		 & = \sum_{j=1,2} \dfrac{n_{c_j}}{n_{p}} [\var_{x \in C_j} (\theta(X)) + Var_{x \in C_{j}}(\hat{\theta}_{C_j}(X_{p};J)) +  \\ 
+		 & \qquad \qquad [ E(\hat{\theta}(X_{p};J)) - E_{X\in C_{j}}(\theta(X)) ]^2  ]
+	\end{aligned} 
+\end{equation}
+
+ 
+It's computational expensive to re-evaluate $ \hat{\theta} $ for all possible splitting points, so we approximate $ \hat{\theta} $ by $ \tilde{\theta} $ so that  $ \tilde{\theta} $ is calculated at the parent node for one time. 
+
+By Taylor expansion and proof of proposition 2:
+\begin{equation}\label{key}
+	E(\varphi(X_p)) = E_{x \in C}(\varphi(x_C)) + (\hat{\theta}_P - \hat{\theta}_C) *  E_{x\in P}(\dfrac{\partial \varphi_{\hat{\theta}, \hat \nu}}{\partial \hat{\theta}}) + O_P(r^2, 1/n_C)
+\end{equation}
+The error term is bounded and ignored as $ n_C $ is large. Then, we have 
+\begin{equation}
+	\begin{aligned}\label{approximation}
+	\hat{\theta}_C \approx	\tilde{\theta}_C & = \hat{\theta}_{P} - \dfrac{1}{n_{p}} A_{P}^{-1} \sum\limits_{i \in C} \xi^T \varphi_{\hat{\theta}, \hat{\nu}}(O_{i}) \\
+		& = \hat{\theta}_{P} - \dfrac{1}{n_P} \sum_{i\in C} \rho_{i}
+	\end{aligned}
+\end{equation}
+where $ \xi $ is a column vector that selects $ \theta $, and  $ A_P $ is $ \dfrac{1}{n_P}   \sum\limits_{i \in C} \dfrac{\partial \varphi}{\partial  \hat{\theta}}(O_i) $. In the source code, $ \xi $  equivalent to looping over all columns of $ X $. 
+
+
+Now we go back to equation (\ref{error}) and replace $ \hat{\theta} $ by $ \tilde{\theta} $. The  last term is bounded by $ O(r^4) $ and removed. 
+
+\begin{equation}\label{key}
+	err(C_1, C_2) = \sum_{j=1,2} \dfrac{n_{c_j}}{n_{p}} [\var_{x \in C_j} (\theta(X)) + \var_{x \in C_{j}}(\tilde{\theta}_{C_j}(X_{p};J))]  + O_P(\dfrac{1}{n_{c_1}}, \dfrac{1}{n_{n_2}})
+\end{equation}
+
+Note, $  \var_{x \in C_{j}}(\tilde{\theta}_{C_j}(X_{p};J)) $ is the sampling noise and can be ignored when $ n_P $ is large, and $ O_P(\dfrac{1}{n_{c_1}}, \dfrac{1}{n_{n_2}}) $ is bounded and small because we assume $ n_P >> r^{-2} $, where $ r $ is some positive value away from node $ P $ (appendix, proof of proposition 1). We keep expanding the first term into parent node level:
+
+\begin{equation}
+	\begin{aligned}\label{key}
+		err(C1, C2) & \approx \sum\limits_{j=1,2} \dfrac{n_{c_j}}{n_{P}}[ E_{x\in C_j}[\theta(X)^2] - [E_{x\in C_j}(\theta(X))]^2  ] \\
+		& = \var_{x\in P}(\theta(X)) +  [E_{x \in P} (\theta(X))]^2 - \sum\limits_{j=1,2}\dfrac{n_{c_j}}{n_{P}}[E(\theta(X))]^2 \\
+		& = \var_{x\in P}(\theta(X)) +  [\dfrac{(\sum_{x \in C_1}\theta + \sum_{x \in C_2}\theta)^2}{n_{P}^2} ] - \sum\limits_{j=1,2}\dfrac{n_{c_j}}{n_{P}}[E(\theta(X))]^2 \\
+		& =  \var_{x\in P}(\theta(X)) - \dfrac{n_{c_1}n_{c_2}}{n_{P}^2} [ E_{x\in C_2}(\theta) - E_{x \in C_1}(\theta)]^2 \\
+		& = \var_{x\in P}(\theta(X)) - \dfrac{n_{c_1}n_{c_2}}{n_{P}^2} E[ (\hat{\theta}_{C_2} - \hat{\theta}_{C_1})^2]
+	\end{aligned}
+\end{equation}
+
+Now the first term is calculated once in the parent node and becomes constant, so we can ignore it. We reassemble the proposition 1:
+\begin{equation}\label{key}
+ \Delta(C_1, C_2)	:= \dfrac{n_{c_1}n_{c_2}}{n_{P}^2} [ \hat{\theta}_{C_2} - \hat{\theta}_{C_1} ]^2
+\end{equation}
+We use the proof of Proposition 2 and have 
+\begin{align}\label{key}
+	\hat{\theta}_{C_j} - \tilde{\theta}_{C_j} = O_P(r, 1/\sqrt{n_{C_j}}) 
+\end{align}
+We plug in equation (\ref{approximation}) and approximate $ \Delta(C_1, C_2) $ by $ \tilde{\Delta}(C_1, C_2) $:
+
+\begin{equation}\label{splitting}
+	 \Delta(C_1, C_2) = \tilde{\Delta}(C_1, C_2) = \sum\limits_{j=1,2} \dfrac{1}{n_j}( \sum\limits_{x \in C_j} \rho_{i}  )^2 + O_P(r^2, 1/n_C1, 1/n_c2)
+\end{equation}
+The error term can be ignored as $ n_C $ is large. 
+
+In words, the equation (\ref{splitting}) is the splitting rule that maximize children nodes heterogeneity, and $ err(C_1, C_2) $ maximize the difference between parent node and children node variance (I try to rewrite equation (\ref{error}), but I am not able to show the error bounds). In addition, for a given node $ P $, we only need to compute $ \sum\limits_{i \in C} \xi^T \varphi_{\hat{\theta}, \hat{\nu}}(O_{i}) $ per splitting point because $ A_P $ is a scaling constant. 
+
+We then use the optimal splitting rules to split the other subset of data. Node values are then estimated in the new subset. 
+
+\section{Causal Forest }
+Section 6.1 in the paper.
+
+We have the functional form for causal regression
+\begin{equation}\label{key}
+	Y = W\beta(X) + C(X)
+\end{equation}
+where $ \beta(X) $ is the parameter in focus, and $ C(X) $ is interception term. 
+
+We have the scoring function:
+\begin{equation}\label{key}
+	\varphi = [Y-W\beta(X)]W^T
+\end{equation}
+where $ \theta = \xi \beta(X) $.
+ 
+By setting the  mean square error as the loss function, we get the solution $\hat{\theta} $:
+\begin{equation}\label{key}
+	\hat{\theta} = \xi^T(WW^{T})^{-1}WY
+\end{equation}
+and the splitting rule is:
+\begin{align}\label{key}
+	\rho & = \xi^T A_{P}^{-1}\varphi \\ 
+	A_{P} & = \dfrac{1}{n_P} WW^T 
+\end{align}
+
+Note, however, we demean the treatment assignment $ W $ and outcome $ Y $ so that the estimators can be robust to counfounding effect (section 6.1).
+
+On the other hand, the splitting point is independent on X.
+
+
+In the source code, the splitting rule is first calculating the local $ \beta $ from sample data
+\begin{equation}\label{key}
+	\hat{\beta} = \dfrac{(W-\bar{W})[Y-\bar(Y)]}{(W-\bar{W})^2}
+\end{equation}
+then calculate $ response_{i} $ per splitting point and column of feature
+\begin{equation}\label{key}
+		response_{i} = (W-\bar{W})[Y-\bar{Y} - \hat{\beta}(W-\bar{W})] 
+\end{equation}
+
+then we find the splitting point that give the max $ decrease $
+\begin{equation}\label{key}
+	decrease = \dfrac{[\sum\limits_{i \in left} response_{i}]^2}{n_{left}} +  \dfrac{[\sum\limits_{i \in right} response_{i}]^2}{n_{right}}
+\end{equation}
+
+
+\section{Distribution on Splitting Point}
+Suppose we have a protective profiles for users, such as race, gender, etc. We don't want to use them to estimate treatment effect, but we want to make sure targets that have similar protective profiles share similar target probability. 
+
+
+When splitting the data, we purpose to add a penalty term. However,  the splitting point range is not bounded. The plots below are simulations for the decrease value in different splitting point.  
+
+
+\begin{figure}[H]
+	\centering
+	\label{fig:betasample}
+	\includegraphics[width=0.7\linewidth]{"experiments/decrease range/random_sample"}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\label{fig:betasample}
+	\includegraphics[width=0.7\linewidth]{"experiments/decrease range/beta_sample"}
+\end{figure}
+
+\end{document}
+

@@ -119,7 +119,9 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
-                          "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
+                          "honesty.prune.leaves", "alpha", "imbalance.penalty",
+                          "target.weight.penalty" # shall we include it ?--> need to adjust sample range in tune_balanced_forest
+                          )
 
   if( is.null(target.avg.weights) || max(sapply(target.avg.weights, function(x) max(abs(x))))  == 0  ){
     all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']

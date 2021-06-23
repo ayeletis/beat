@@ -1,3 +1,6 @@
+#' @import data.table
+
+
 validate_X <- function(X, allow.na = FALSE) {
   valid.classes <- c("matrix", "data.frame", "dgCMatrix")
 

@@ -11,3 +11,7 @@ releases/*
 *.rd
 *.Rd
 *.png
+r-package/grf/.vs/slnx.sqlite
+r-package/grf/.vs/VSWorkspaceState.json
+r-package/grf/.vs/grf/v15/.suo
+r-package/grf/src/.vscode/settings.json

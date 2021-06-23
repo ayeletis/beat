@@ -136,6 +136,9 @@
 #' tau.hat <- predict(tau.forest)$predictions
 #' }
 #'
+
+#' @import data.table
+
 #' @export
 balanced_causal_forest <- function(X,
                           Y,
@@ -168,18 +171,38 @@ balanced_causal_forest <- function(X,
                           orthog.boosting = FALSE,
                           num.threads = NULL,
                           seed = runif(1, 0, .Machine$integer.max)) {
+  # :----  procedure ---:
+  # 1. check input data
+  # 2. get list of target weights: per column of X, bin X and get column-wise average of target weight
+  # 3. (default): small forest to get Y_hat and W_hat, then Y-Y_hat, W - W_hat
+  # 4. tune parameters via the same balanced_calsal_forest function
+  #    a.tunnalbe parameters are in tune_balanced_causal_forest,
+  #    b. prepare data and pass into tune_balanced_forest
+  #       * random sample parameters from some distributions
+  #       * fit small forest and get debiased.error
+  #       * fit dice kriging: debiased.error ~ parameter values and find the smallest combinations (not necessary the tried version)
+  #       * re-fit balanced_causal_forest by the best set and larger tress
+  #       * return the best or default parameter set
+  # 5. fit actual balanced_calsal_forest
+  # +++++++++++++++++++++
+  # to make penalty tunable, change tune_balance_causal_forest.R and tunning_balanced.R
 
+  # check input data
   has.missing.values <- validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   W <- validate_observations(W, X)
   stopifnot(target.weight.penalty>=0)
   stopifnot(nrow(target.weights) == nrow(X))
-  # target weight
+
+  # standardize target weight
   if(!is.null(target.weights)){
     stopifnot(dim(target.weights)[1] == dim(X)[1])
-    if(isTRUE(target.weight.standardize)  ){
-      target.weights = apply(target.weights, 2, standardize) # mean 0 and sd 1 per column, defined in input_utilities.R
+
+    if(isTRUE(target.weight.standardize) ){
+      # mean 0 and sd 1 per column, defined in input_utilities.R
+      # if de-mean only, penalty goes large when dim increaes
+      target.weights = apply(target.weights, 2, standardize)
     }
 
   }else{
@@ -187,11 +210,12 @@ balanced_causal_forest <- function(X,
     stop("If target.weight is missing, use casual_forest")
   }
 
-  #output list : [num x feture] [[num rows, num target weight feature]]
-  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
+  #output list : [dim(X)[2]] [[num rows, num target weight feature]]
+  target.avg.weights = construct_target_weight_mean(x = X,
+                                                    z = target.weights,
                                                     num_breaks = target.weight.bins.breaks)
-  ##
 
+  # check args
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <-
     validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
@@ -205,14 +229,14 @@ balanced_causal_forest <- function(X,
     "honesty.prune.leaves",
     "alpha",
     "imbalance.penalty",
-    "target.weight.penalty"
+    "target.weight.penalty" # shall we include it? --> also change tune_balanced_causal_forest.R
   )
 
-  if(max(abs(target.weights)) == 0){
-    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
-  }
+  # if(max(abs(target.weights)) == 0){
+  #   all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
+  # }
 
-
+  # used to pre-process Y and W, so we don't use target weights
   args.orthog <- list(
     X = X,
     num.trees = max(50, num.trees / 4),
@@ -235,7 +259,7 @@ balanced_causal_forest <- function(X,
     seed = seed # ,
   )
   # use standard forest
-  if (is.null(Y.hat) && !orthog.boosting) {
+  if (is.null(Y.hat) && !orthog.boosting) { # default setting goes here
     forest.Y <- do.call(regression_forest, c(Y = list(Y), args.orthog))
     Y.hat <- predict(forest.Y)$predictions
   } else if (is.null(Y.hat) && orthog.boosting) {
@@ -267,7 +291,7 @@ balanced_causal_forest <- function(X,
   for(i in remove_args){
     args.target[i] = NULL
   }
-  # not used 
+  # not used
   # if(sum(abs(target.weights))>0){
   #   if (is.null(target.weights.hat) && !orthog.boosting) {
   #     forest.weight <- do.call(multi_regression_forest, c(Y = list(target.weights), args.target))
@@ -288,15 +312,17 @@ balanced_causal_forest <- function(X,
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
 
-
+  # combine them into one matrix and track column index for splitting
   data <- create_train_matrices(
     X,
     outcome = Y.centered,
     treatment = W.centered,
     sample.weights = sample.weights)
 
+  # for tunning and building forest
   args <- list(
     num.trees = num.trees,
+    # nested list of matrix, one matrix per column of X
     target.avg.weights = target.avg.weights,
     target.weight.penalty = target.weight.penalty,
     clusters = clusters,
@@ -317,6 +343,7 @@ balanced_causal_forest <- function(X,
     reduced.form.weight = 0
   )
 
+  # for tunning
   tuning.output <- NULL
   if (!identical(tune.parameters, "none")) {
     tuning.output <- tune_balanced_causal_forest(
@@ -350,7 +377,10 @@ balanced_causal_forest <- function(X,
     args <- modifyList(args, as.list(tuning.output[["params"]]))
   }
 
+  # running actual forest
   forest <- do.call.rcpp(balanced_causal_train, c(data, args))
+
+  # prepare output
   class(forest) <- c("causal_forest", "grf")
   forest[["ci.group.size"]] <- ci.group.size
   forest[["X.orig"]] <- X
