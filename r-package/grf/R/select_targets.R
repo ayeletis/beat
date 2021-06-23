@@ -286,6 +286,10 @@ optimization_search = function(tau_vector,
   group_rest_n = dim(group_rest)[1]
   roi_result=main_roi()
 
+  ## so fill back in the roi_results for tau > min_tau
+  target_idx = as.integer(target_idx)
+  target_idx[target_idx==1] = roi_result # some are 1 but some are 0
+
   return(roi_result)
 }
 

@@ -109,7 +109,8 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max),
                               target.avg.weights=NULL,
-                              target.weight.penalty=0) {
+                              target.weight.penalty=0,
+                              target.weight_penalty.metric='rate_split_l2_norm') {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
@@ -167,7 +168,8 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                seed = seed,
                reduced.form.weight = 0,
                target.avg.weights=target.avg.weights,
-               target.weight.penalty=target.weight.penalty)
+               target.weight.penalty=target.weight.penalty,
+               target.weight_penalty.metric=target.weight_penalty.metric)
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params

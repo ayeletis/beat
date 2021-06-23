@@ -151,6 +151,7 @@ balanced_causal_forest <- function(X,
                           target.weight.penalty = 0,
                           target.weight.bins.breaks = 256,
                           target.weight.standardize = TRUE,
+                          target.weight_penalty.metric = "rate_split_l2_norm",
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -210,6 +211,15 @@ balanced_causal_forest <- function(X,
     stop("If target.weight is missing, use casual_forest")
   }
 
+  # verify penalty metric
+  available_metrics = c("rate_split_l2_norm", # left, right: l2 norm(colmean target weight)* penalty rate * node decrease
+                        "rate_euclidean_distancey", # (left+right decrease) -  Euclidean distance (column mean target weight left, right ) * penalty rate
+                        "rate_cosine_similarity"  # (left+right decrease) -   (1-cos_sim(column mean target weight left, right )) * penalty rate
+                        )
+  if(! target.weight_penalty.metric %in% available_metrics){
+    stop( sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ' )))
+  }
+
   #output list : [dim(X)[2]] [[num rows, num target weight feature]]
   target.avg.weights = construct_target_weight_mean(x = X,
                                                     z = target.weights,
@@ -242,7 +252,7 @@ balanced_causal_forest <- function(X,
     num.trees = max(50, num.trees / 4),
     sample.weights = sample.weights,
     #target.weights =  target.weights,
-    #target.weight.penalty=target.weight.penalty,
+    #target.weight.penalty=target.weight.penalty, # no target weight in center data
     clusters = clusters,
     equalize.cluster.weights = equalize.cluster.weights,
     sample.fraction = sample.fraction,
@@ -287,7 +297,7 @@ balanced_causal_forest <- function(X,
 
   # orthog target weight matrix for multi reg
   args.target = copy(args.orthog)
-  remove_args = c("ci.group.size",'tune.parameters')
+  remove_args = c("ci.group.size", 'tune.parameters')
   for(i in remove_args){
     args.target[i] = NULL
   }
@@ -325,6 +335,7 @@ balanced_causal_forest <- function(X,
     # nested list of matrix, one matrix per column of X
     target.avg.weights = target.avg.weights,
     target.weight.penalty = target.weight.penalty,
+    target.weight.penalty_metric = target.weight_penalty.metric,
     clusters = clusters,
     samples.per.cluster = samples.per.cluster,
     sample.fraction = sample.fraction,
@@ -355,6 +366,7 @@ balanced_causal_forest <- function(X,
       sample.weights = sample.weights,
       target.avg.weights = target.avg.weights,
       target.weight.penalty = target.weight.penalty,
+      target.weight_penalty.metric = target.weight_penalty.metric,
       clusters = clusters,
       equalize.cluster.weights = equalize.cluster.weights,
       sample.fraction = sample.fraction,
@@ -394,6 +406,7 @@ balanced_causal_forest <- function(X,
   forest[["tunable.params"]] <- args[all.tunable.params]
   forest[["tuning.output"]] <- tuning.output
   forest[["has.missing.values"]] <- has.missing.values
+  forest[["target.weight_penalty.metric"]] <- target.weight_penalty.metric
 
   forest
 }
