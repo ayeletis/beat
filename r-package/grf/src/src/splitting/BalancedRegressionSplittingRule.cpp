@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <iostream>
 #include "BalancedRegressionSplittingRule.h"
+#include "SplittingPenaltyMetric.h"
 
 namespace grf
 {
@@ -143,6 +144,12 @@ namespace grf
                 target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
             }
         }
+
+        // cache: column-wise sum
+        Eigen::VectorXd target_weights_sum = target_avg_weights_sorted.colwise().sum();
+
+        std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
+
         // Fill counter and sums buckets
         // used to store each split
         size_t split_index = 0;
@@ -241,12 +248,20 @@ namespace grf
                 // penalize splits by target weights
                 if (target_weight_penalty_rate > 0)
                 {
-                    Eigen::VectorXd left_target_avg_weight = target_avg_weights_sorted.topRows(n_left).colwise().mean();
-                    Eigen::VectorXd right_target_avg_weight = target_avg_weights_sorted.bottomRows(n_right).colwise().mean();
+                    Eigen::VectorXd target_weights_sum_left = target_avg_weights_sorted.topRows(n_left).colwise().sum();
+                    Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
 
-                    double penalty_target_weight = left_target_avg_weight.lpNorm<2>() * decrease_left + right_target_avg_weight.lpNorm<2>() * decrease_right; /// weight_sum_left   / weight_sum_right
-                    // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-                    decrease -= penalty_target_weight * target_weight_penalty_rate;
+                    Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
+                    Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_right;
+
+                    double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate = target_weight_penalty_rate,
+                                                                                             decrease_left = decrease_left,
+                                                                                             decrease_right = decrease_right,
+                                                                                             target_weights_avg_left = target_weights_avg_left,
+                                                                                             target_weights_avg_right = target_weights_avg_right,
+                                                                                             target_weight_penalty_metric = target_weight_penalty_metric);
+
+                    decrease -= imbalance_target_weight_penalty;
                 }
 
                 if (decrease > best_decrease)

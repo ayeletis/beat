@@ -94,6 +94,7 @@ balanced_regression_forest <- function(X, Y,
                               target.weight.penalty = 0,
                               target.weight.bins.breaks = 256,
                               target.weight.standardize = TRUE,
+                              target.weight.penalty.metric = "split_l2_norm_rate",
                               clusters = NULL,
                               equalize.cluster.weights = FALSE,
                               sample.fraction = 0.5,
@@ -112,45 +113,58 @@ balanced_regression_forest <- function(X, Y,
                               compute.oob.predictions = TRUE,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max)) {
-  has.missing.values <- validate_X(X, allow.na = TRUE)
-  validate_sample_weights(sample.weights, X)
-  Y <- validate_observations(Y, X)
-  stopifnot(target.weight.penalty>=0)
-  stopifnot(nrow(target.weights) == nrow(X))
+    has.missing.values <- validate_X(X, allow.na = TRUE)
+    validate_sample_weights(sample.weights, X)
+    Y <- validate_observations(Y, X)
+    stopifnot(target.weight.penalty >= 0)
+    stopifnot(nrow(target.weights) == nrow(X))
 
-  # target weight
-  if(!is.null(target.weights)){
-    stopifnot(dim(target.weights)[1] == dim(X)[1])
-    if(isTRUE(target.weight.standardize)  ){
-      target.weights = apply(target.weights, 2, standardize) # per column
+    # target weight
+    if (!is.null(target.weights)) {
+        stopifnot(dim(target.weights)[1] == dim(X)[1])
+        if (isTRUE(target.weight.standardize)) {
+            target.weights = apply(target.weights, 2, standardize) # per column
+        }
+
+    } else {
+        #target.weights = as.matrix(replicate(NROW(X), 0))
+        stop("If target.weight is missing, use regression_forest")
+
     }
+    # verify penalty metric
+    available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean target weight)* penalty rate * node decrease
+                        "euclidean_distance_rate", # (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
+                        "cosine_similarity_rate", # (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
 
-  }else{
-    #target.weights = as.matrix(replicate(NROW(X), 0))
-    stop("If target.weight is missing, use regression_forest")
-
-  }
-#output list : [num x feture] [[num rows, num target weight feature]]
-  target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
+                        "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate 
+                        "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
+                        "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
+                        )
+    if (!target.weight.penalty.metric %in% available_metrics) {
+        stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
+    }
+    #output list : [num x feture] [[num rows, num target weight feature]]
+    target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
                                                     num_breaks = target.weight.bins.breaks)
-  ##
+    ##
 
 
-  clusters <- validate_clusters(clusters, X)
-  samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
-  num.threads <- validate_num_threads(num.threads)
+    clusters <- validate_clusters(clusters, X)
+    samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
+    num.threads <- validate_num_threads(num.threads)
 
-  all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
+    all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty", "target.weight.penalty")
 
-  if(max(abs(target.weights)) == 0){
-    all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
-  }
+    if (max(abs(target.weights)) == 0) {
+        all.tunable.params = all.tunable.params[all.tunable.params != 'target.weight.penalty']
+    }
 
-  data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
-  args <- list(num.trees = num.trees,
+    data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
+    args <- list(num.trees = num.trees,
               target.avg.weights = target.avg.weights,
               target.weight.penalty = target.weight.penalty,
+              target.weight.penalty.metric = target.weight.penalty.metric,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
                sample.fraction = sample.fraction,
@@ -166,12 +180,13 @@ balanced_regression_forest <- function(X, Y,
                num.threads = num.threads,
                seed = seed)
 
-  tuning.output <- NULL
-  if (!identical(tune.parameters, "none")){
-    tuning.output <- tune_balanced_regression_forest(X, Y,
+    tuning.output <- NULL
+    if (!identical(tune.parameters, "none")) {
+        tuning.output <- tune_balanced_regression_forest(X, Y,
                                             sample.weights = sample.weights,
                                             target.avg.weights = target.avg.weights,
                                             target.weight.penalty = target.weight.penalty,
+                                            target.weight.penalty.metric = target.weight.penalty.metric,
                                             clusters = clusters,
                                             equalize.cluster.weights = equalize.cluster.weights,
                                             sample.fraction = sample.fraction,
@@ -189,22 +204,23 @@ balanced_regression_forest <- function(X, Y,
                                             tune.num.draws = tune.num.draws,
                                             num.threads = num.threads,
                                             seed = seed)
-    args <- modifyList(args, as.list(tuning.output[["params"]]))
-  }
+        args <- modifyList(args, as.list(tuning.output[["params"]]))
+    }
 
-  forest <- do.call.rcpp(balanced_regression_train, c(data, args))
-  class(forest) <- c("regression_forest", "grf")
-  forest[["ci.group.size"]] <- ci.group.size
-  forest[["X.orig"]] <- X
-  forest[["Y.orig"]] <- Y
-  forest[["sample.weights"]] <- sample.weights
-  forest[["clusters"]] <- clusters
-  forest[["equalize.cluster.weights"]] <- equalize.cluster.weights
-  forest[["tunable.params"]] <- args[all.tunable.params]
-  forest[["tuning.output"]] <- tuning.output
-  forest[["has.missing.values"]] <- has.missing.values
+    forest <- do.call.rcpp(balanced_regression_train, c(data, args))
+    class(forest) <- c("regression_forest", "grf")
+    forest[["ci.group.size"]] <- ci.group.size
+    forest[["X.orig"]] <- X
+    forest[["Y.orig"]] <- Y
+    forest[["sample.weights"]] <- sample.weights
+    forest[["clusters"]] <- clusters
+    forest[["equalize.cluster.weights"]] <- equalize.cluster.weights
+    forest[["tunable.params"]] <- args[all.tunable.params]
+    forest[["tuning.output"]] <- tuning.output
+    forest[["has.missing.values"]] <- has.missing.values
+    forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
 
-  forest
+    forest
 }
 
 #' Predict with a regression forest
@@ -273,61 +289,61 @@ predict.regression_forest <- function(object, newdata = NULL,
                                       num.threads = NULL,
                                       estimate.variance = FALSE,
                                       ...) {
-  local.linear <- !is.null(linear.correction.variables)
-  allow.na <- !local.linear
+    local.linear <- !is.null(linear.correction.variables)
+    allow.na <- !local.linear
 
-  # If possible, use pre-computed predictions.
-  if (is.null(newdata) && !estimate.variance && !local.linear && !is.null(object$predictions)) {
-    return(data.frame(
+    # If possible, use pre-computed predictions.
+    if (is.null(newdata) && !estimate.variance && !local.linear && !is.null(object$predictions)) {
+        return(data.frame(
       predictions = object$predictions,
       debiased.error = object$debiased.error,
       excess.error = object$excess.error))
-  }
-
-  num.threads <- validate_num_threads(num.threads)
-  forest.short <- object[-which(names(object) == "X.orig")]
-  X <- object[["X.orig"]]
-  train.data <- create_train_matrices(X, outcome = object[["Y.orig"]])
-
-  if (local.linear) {
-    linear.correction.variables <- validate_ll_vars(linear.correction.variables, ncol(X))
-
-    if (is.null(ll.lambda)) {
-      ll.regularization.path <- tune_ll_regression_forest(
-        object, linear.correction.variables,
-        ll.weight.penalty, num.threads)
-      ll.lambda <- ll.regularization.path$lambda.min
-    } else {
-      ll.lambda <- validate_ll_lambda(ll.lambda)
     }
 
-    # subtract 1 to account for C++ indexing
-    linear.correction.variables <- linear.correction.variables - 1
-  }
-  args <- list(forest.object = forest.short,
+    num.threads <- validate_num_threads(num.threads)
+    forest.short <- object[-which(names(object) == "X.orig")]
+    X <- object[["X.orig"]]
+    train.data <- create_train_matrices(X, outcome = object[["Y.orig"]])
+
+    if (local.linear) {
+        linear.correction.variables <- validate_ll_vars(linear.correction.variables, ncol(X))
+
+        if (is.null(ll.lambda)) {
+            ll.regularization.path <- tune_ll_regression_forest(
+        object, linear.correction.variables,
+        ll.weight.penalty, num.threads)
+            ll.lambda <- ll.regularization.path$lambda.min
+        } else {
+            ll.lambda <- validate_ll_lambda(ll.lambda)
+        }
+
+        # subtract 1 to account for C++ indexing
+        linear.correction.variables <- linear.correction.variables - 1
+    }
+    args <- list(forest.object = forest.short,
                num.threads = num.threads,
                estimate.variance = estimate.variance)
-  ll.args <- list(ll.lambda = ll.lambda,
+    ll.args <- list(ll.lambda = ll.lambda,
                   ll.weight.penalty = ll.weight.penalty,
                   linear.correction.variables = linear.correction.variables)
 
-  if (!is.null(newdata)) {
-    validate_newdata(newdata, X, allow.na = allow.na)
-    test.data <- create_test_matrices(newdata)
-    if (!local.linear) {
-      ret <- do.call.rcpp(regression_predict, c(train.data, test.data, args))
+    if (!is.null(newdata)) {
+        validate_newdata(newdata, X, allow.na = allow.na)
+        test.data <- create_test_matrices(newdata)
+        if (!local.linear) {
+            ret <- do.call.rcpp(regression_predict, c(train.data, test.data, args))
+        } else {
+            ret <- do.call.rcpp(ll_regression_predict, c(train.data, test.data, args, ll.args))
+        }
     } else {
-      ret <- do.call.rcpp(ll_regression_predict, c(train.data, test.data, args, ll.args))
+        if (!local.linear) {
+            ret <- do.call.rcpp(regression_predict_oob, c(train.data, args))
+        } else {
+            ret <- do.call.rcpp(ll_regression_predict_oob, c(train.data, args, ll.args))
+        }
     }
-  } else {
-    if (!local.linear) {
-      ret <- do.call.rcpp(regression_predict_oob, c(train.data, args))
-    } else {
-      ret <- do.call.rcpp(ll_regression_predict_oob, c(train.data, args, ll.args))
-    }
-  }
 
-  # Convert list to data frame.
-  empty <- sapply(ret, function(elem) length(elem) == 0)
-  do.call(cbind.data.frame, ret[!empty])
+    # Convert list to data frame.
+    empty <- sapply(ret, function(elem) length(elem) == 0)
+    do.call(cbind.data.frame, ret[!empty])
 }

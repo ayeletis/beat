@@ -20,6 +20,8 @@
 #include <Rcpp.h>
 #include "BalancedInstrumentalSplittingRule.h"
 #include <RcppEigen.h>
+#include "SplittingPenaltyMetric.h"
+
 namespace grf
 {
 
@@ -336,9 +338,9 @@ namespace grf
           Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
 
           Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
-          Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_left;
+          Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_right;
 
-          double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate,
+          double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate = target_weight_penalty_rate,
                                                                                    decrease_left = decrease_left,
                                                                                    decrease_right = decrease_right,
                                                                                    target_weights_avg_left = target_weights_avg_left,
@@ -360,37 +362,5 @@ namespace grf
       }
     }
   }
-
-  double calculate_target_weight_penalty(double penalty_rate,
-                                         double decrease_left,
-                                         double decrease_right,
-                                         Eigen::VectorXd target_weights_avg_left,
-                                         Eigen::VectorXd target_weights_avg_right,
-                                         std::string target_weight_penalty_metric)
-  {
-    double imbalance;
-    if (target_weight_penalty_metric == "rate_split_l2_norm")
-    {
-      // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-      imbalance = target_weights_avg_left.lpNorm<2>() * decrease_left + target_weights_avg_right.lpNorm<2>() * decrease_right;
-    }
-    else if (target_weight_penalty_metric == "rate_euclidean_distance")
-    {
-      double imbalance = sqrt((target_weights_avg_left - target_weights_avg_right).pow(2).sum());
-    }
-    else if (target_weight_penalty_metric == "rate_cosine_similarity")
-    {
-      double upper = (target_weights_avg_left * target_weights_avg_right).sum();
-      double lower = sqrt(target_weights_avg_left.pow(2).sum()) * sqrt(target_weights_avg_right.pow(2).sum());
-      double cosine_similarity = upper / lower; //−1 = exactly opposite, 1 = exactly the same
-      imbalance = 1 - cosine_similarity;
-    }
-    else
-    { // the R wrapper function shall have filtered out
-      imbalance = 0;
-    }
-
-    return imbalance * penalty_rate;
-  };
 
 } // namespace grf

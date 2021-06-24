@@ -43,15 +43,6 @@ namespace grf
                          std::vector<double> &split_values,
                          std::vector<bool> &send_missing_left);
 
-    double calculate_target_weight_penalty(double penalty_rate,
-                                           double decrease_left,
-                                           double decrease_right,
-                                           Eigen::VectorXd target_weight_avg_left,
-                                           Eigen::VectorXd target_weight_avg_right,
-                                           std::string target_weight_penalty_metric
-
-    );
-
   private:
     void find_best_split_value(const Data &data,
                                size_t node,
@@ -77,7 +68,6 @@ namespace grf
     size_t *num_small_z;
     double *sums_z;
     double *sums_z_squared;
-    // Eigen::MatrixXf *target_avg_weights;
     uint min_node_size;
     double alpha;
     double imbalance_penalty;
