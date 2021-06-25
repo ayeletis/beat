@@ -20,7 +20,7 @@ Description: A pluggable package for forest-based statistical estimation and inf
 Depends:
     R (>= 3.5.0)
 License: GPL-3
-LinkingTo: Rcpp, RcppEigen
+LinkingTo: RcppArmadillo, RcppEigen, Rcpp
 Imports:
 	data.table,
     DiceKriging,

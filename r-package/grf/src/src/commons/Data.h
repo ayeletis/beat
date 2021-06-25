@@ -21,10 +21,15 @@
 #include <iostream>
 #include <set>
 #include <vector>
-#include <Rcpp.h>
-#include "Eigen/Dense"
 #include "globals.h"
 #include "optional/optional.hpp"
+#include "Eigen/Dense"
+ #include "Arma/rcpparma" 
+// [[Rcpp::depends(RcppArmadillo)]]
+
+
+
+
 
 namespace grf
 {
@@ -64,11 +69,14 @@ namespace grf
 
     void set_censor_index(size_t index);
 
-    void set_target_avg_weights(Rcpp::List x);
+    void set_target_avg_weights(arma::cube x);
 
     void set_target_weight_penalty(double target_weight_penalty);
 
     void set_target_weight_penalty_metric(std::string metric_type);
+
+    void set_num_target_weight_cols(size_t num_cols);
+
     /**
    * Sorts and gets the unique values in `samples` at variable `var`.
    *
@@ -109,20 +117,23 @@ namespace grf
     const std::set<size_t> &get_disallowed_split_variables() const;
 
     // Rcpp::NumericVector get_target_avg_weights(size_t var, size_t row) const;
-    Eigen::MatrixXd get_target_avg_weights(size_t var);
+    arma::rowvec get_target_weight_row(size_t var, size_t row) const;
 
     double get_target_weight_penalty() const;
 
-    std::string get_target_weight_penalty_metric() const; 
+    std::string get_target_weight_penalty_metric() const;
 
-    double target_weight_penalty;
-    std::string target_weight_penalty_metric;
-
-    std::vector<Eigen::MatrixXd> target_avg_weights;
+    size_t get_num_target_weight_cols() const;
 
   protected:
     size_t num_rows;
     size_t num_cols;
+    size_t num_target_weight_cols;
+
+    double target_weight_penalty;
+    std::string target_weight_penalty_metric;
+
+    arma::cube target_avg_weights;
 
     std::set<size_t> disallowed_split_variables;
     nonstd::optional<std::vector<size_t>> outcome_index;

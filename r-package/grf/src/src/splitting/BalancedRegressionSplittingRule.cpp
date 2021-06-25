@@ -135,18 +135,18 @@ namespace grf
 
         // target weight penalty
         double target_weight_penalty_rate = data.get_target_weight_penalty();
-        Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var];
-        Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
-        if (target_weight_penalty_rate > 0)
-        {
-            for (size_t i = 0; i < num_samples; i++)
-            {
-                target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
-            }
-        }
+        // Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var];
+        // Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
+        // if (target_weight_penalty_rate > 0)
+        // {
+        //     for (size_t i = 0; i < num_samples; i++)
+        //     {
+        //         target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
+        //     }
+        // }
 
-        // cache: column-wise sum
-        Eigen::VectorXd target_weights_sum = target_avg_weights_sorted.colwise().sum();
+        // // cache: column-wise sum
+        // Eigen::VectorXd target_weights_sum = target_avg_weights_sorted.colwise().sum();
 
         std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
 
@@ -246,23 +246,23 @@ namespace grf
                 decrease -= penalty;
 
                 // penalize splits by target weights
-                if (target_weight_penalty_rate > 0)
-                {
-                    Eigen::VectorXd target_weights_sum_left = target_avg_weights_sorted.topRows(n_left).colwise().sum();
-                    Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
+                // if (target_weight_penalty_rate > 0)
+                // {
+                //     Eigen::VectorXd target_weights_sum_left = target_avg_weights_sorted.topRows(n_left).colwise().sum();
+                //     Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
 
-                    Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
-                    Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_right;
+                //     Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
+                //     Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_right;
 
-                    double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate = target_weight_penalty_rate,
-                                                                                             decrease_left = decrease_left,
-                                                                                             decrease_right = decrease_right,
-                                                                                             target_weights_avg_left = target_weights_avg_left,
-                                                                                             target_weights_avg_right = target_weights_avg_right,
-                                                                                             target_weight_penalty_metric = target_weight_penalty_metric);
+                //     double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate = target_weight_penalty_rate,
+                //                                                                              decrease_left = decrease_left,
+                //                                                                              decrease_right = decrease_right,
+                //                                                                              target_weights_avg_left = target_weights_avg_left,
+                //                                                                              target_weights_avg_right = target_weights_avg_right,
+                //                                                                              target_weight_penalty_metric = target_weight_penalty_metric);
 
-                    decrease -= imbalance_target_weight_penalty;
-                }
+                //     decrease -= imbalance_target_weight_penalty;
+                // }
 
                 if (decrease > best_decrease)
                 {

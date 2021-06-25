@@ -138,7 +138,8 @@
 #'
 
 #' @import data.table
-
+#' @ipmort Rcpp
+#'
 #' @export
 balanced_causal_forest <- function(X,
                           Y,
@@ -216,7 +217,7 @@ balanced_causal_forest <- function(X,
                         "euclidean_distance_rate", # (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity_rate", # (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
 
-                        "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate 
+                        "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate
                         "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
                         )
@@ -228,6 +229,9 @@ balanced_causal_forest <- function(X,
     target.avg.weights = construct_target_weight_mean(x = X,
                                                     z = target.weights,
                                                     num_breaks = target.weight.bins.breaks)
+
+    # convert to 3d array: [dim(target weight), length(list)]
+    target.avg.weights = array(unlist(target.avg.weights), dim=c(dim(target.avg.weights[[1]]), length(target.avg.weights)))
 
     # check args
     clusters <- validate_clusters(clusters, X)

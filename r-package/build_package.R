@@ -9,7 +9,7 @@ args <- commandArgs(TRUE)
 library(Rcpp)
 library(devtools)
 library(testthat)
-library(roxygen2)
+library(roxygesn2)
 
 package.name <- "grf"
 
@@ -21,7 +21,7 @@ if (!is.na(args[1]) && args[1] == "--as-cran") {
 
 # Auto-generate documentation files
 roxygen2::roxygenise(package.name)
-write("import(data.table)",file="grf/NAMESPACE",append=TRUE)
+# write("import(data.table)",file="grf/NAMESPACE",append=TRUE)
 # Run Rcpp and build the package.
 # Symlinks in `grf/src` point to the Rcpp bindings (`grf/bindings`) and core C++ (`core/src`).
 # Note: we don't link in third_party/Eigen, because for the R package build we provide
@@ -29,7 +29,7 @@ write("import(data.table)",file="grf/NAMESPACE",append=TRUE)
 compileAttributes(package.name)
 clean_dll(package.name)
 build(package.name)
-install.packages("grf_1.2.1.tar.gz", repos=NULL, type="source", 
+install.packages("grf_1.2.1.tar.gz", repos=NULL, type="source",
                  clean = TRUE, Ncpus=parallel::detectCores(),
                  verbose=TRUE,INSTALL_opts = c('--no-lock')
                  )

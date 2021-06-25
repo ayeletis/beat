@@ -85,6 +85,9 @@
 #' r.pred <- predict(r.forest, X.test, estimate.variance = TRUE)
 #' }
 #'
+#'
+#' @ipmort Rcpp
+#'
 #' @export
 #' @importFrom utils modifyList
 balanced_regression_forest <- function(X, Y,
@@ -136,7 +139,7 @@ balanced_regression_forest <- function(X, Y,
                         "euclidean_distance_rate", # (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity_rate", # (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
 
-                        "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate 
+                        "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate
                         "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
                         )
