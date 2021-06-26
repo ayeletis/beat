@@ -24,12 +24,8 @@
 #include "globals.h"
 #include "optional/optional.hpp"
 #include "Eigen/Dense"
- #include "Arma/rcpparma" 
+#include "Arma/rcpparma"
 // [[Rcpp::depends(RcppArmadillo)]]
-
-
-
-
 
 namespace grf
 {
@@ -117,7 +113,7 @@ namespace grf
     const std::set<size_t> &get_disallowed_split_variables() const;
 
     // Rcpp::NumericVector get_target_avg_weights(size_t var, size_t row) const;
-    arma::rowvec get_target_weight_row(size_t var, size_t row) const;
+    arma::vec get_target_weight_row(size_t x_var, size_t sample_id) const;
 
     double get_target_weight_penalty() const;
 

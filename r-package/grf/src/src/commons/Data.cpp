@@ -235,8 +235,9 @@ namespace grf
 
   void Data::set_target_avg_weights(arma::cube x)
   {
+    // input data is R array [num target weights, num obs, num x columns]
     this->target_avg_weights = x;
-    Data::set_num_target_weight_cols(x.n_cols);
+    Data::set_num_target_weight_cols(x.n_rows);
   }
 
   void Data::set_target_weight_penalty(double target_weight_penalty)
@@ -373,9 +374,10 @@ namespace grf
   //   return out.row(row);
   // }
 
-  arma::rowvec Data::get_target_weight_row(size_t var, size_t row) const
+  arma::vec Data::get_target_weight_row(size_t x_var, size_t sample_id) const
   {
-    return target_avg_weights.slice(var).row(row);
+    // matrix in arma is column-major
+    return target_avg_weights.slice(x_var).col(sample_id);
   }
 
   double Data::get_target_weight_penalty() const

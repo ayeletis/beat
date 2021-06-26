@@ -134,11 +134,11 @@ X_test_demog = cbind(X_test,Z_test)
 #
 # # regular tau -- no demographics
 # a = Sys.time()
-# fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
-#                          honesty = TRUE,
-#                          num.trees = num_trees,
-#                          tune.parameters='all',
-#                          seed=my_seed)
+fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
+                         honesty = TRUE,
+                         num.trees = num_trees,
+                         tune.parameters='all',
+                         seed=my_seed)
 #
 # print(Sys.time()-a)
 
@@ -152,10 +152,38 @@ fit_grf = balanced_causal_forest(X_train, Y_train, W_train,
                        target.weight.bins.breaks = 256,
                        # target.weight.penalty.metric = 'cosine_similarity_rate',
                        honesty = TRUE,
+                       # num.threads = 1,
                        num.trees = num_trees,
                        tune.parameters=my_tunable_params,
                        seed=my_seed)
 print(Sys.time()-a)
+
+
+library(microbenchmark)
+microbenchmark(
+  out <- balanced_causal_forest(X_train, Y_train, W_train,
+                                target.weights = as.matrix(Z_train ) ,
+                                target.weight.penalty = 1,
+                                target.weight.standardize = TRUE,
+                                target.weight.bins.breaks = 256,
+                                # target.weight.penalty.metric = 'cosine_similarity_rate',
+                                honesty = TRUE,
+                                # num.threads = 1,
+                                num.trees = num_trees,
+                                tune.parameters=my_tunable_params,
+                                seed=my_seed),
+  times = 10
+)
+
+microbenchmark(
+  out <- fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
+                                  honesty = TRUE,
+                                  num.trees = num_trees,
+                                  tune.parameters='all',
+                                  seed=my_seed),
+  times = 10
+)
+
 
 # ================================================================
 #    Estimate BEAT for different PENALTY and different TARGET_RATE

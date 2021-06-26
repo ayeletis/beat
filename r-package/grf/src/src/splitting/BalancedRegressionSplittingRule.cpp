@@ -81,8 +81,8 @@ namespace grf
 
         // for target weight penalty
         size_t num_target_weight_cols = data.get_num_target_weight_cols();
-        arma::rowvec target_weight_sum(num_target_weight_cols);
-        arma::mat target_weight_left_sum(num_samples, num_target_weight_cols);
+        arma::vec target_weight_sum(num_target_weight_cols);
+        arma::mat target_weight_left_sum(num_samples, num_target_weight_cols); //column major 
         std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
         double target_weight_penalty_rate = data.get_target_weight_penalty();
         //
@@ -121,7 +121,7 @@ namespace grf
                                                                 double &best_decrease, bool &best_send_missing_left,
                                                                 const Eigen::ArrayXXd &responses_by_sample,
                                                                 const std::vector<std::vector<size_t>> &samples,
-                                                                arma::rowvec &target_weight_sum,
+                                                                arma::vec &target_weight_sum,
                                                                 arma::mat &target_weight_left_sum,
                                                                 const std::string &target_weight_penalty_metric,
                                                                 const double &target_weight_penalty_rate)
@@ -175,7 +175,7 @@ namespace grf
                 sums[split_index] += sample_weight * response;
                 ++counter[split_index];
 
-                target_weight_left_sum.row(split_index) = target_weight_sum;
+                target_weight_left_sum.col(split_index) = target_weight_sum;
             }
 
             double next_sample_value = data.get(next_sample, var);
@@ -222,7 +222,7 @@ namespace grf
                 n_left += counter[i];
                 weight_sum_left += weight_sums[i];
                 sum_left += sums[i];
-                arma::rowvec target_weight_sum_left = target_weight_left_sum.row(i);
+                arma::vec target_weight_sum_left = target_weight_left_sum.col(i);
 
                 // Skip this split if one child is too small.
                 if (n_left < min_child_size)
@@ -255,10 +255,10 @@ namespace grf
                 if (target_weight_penalty_rate > 0)
                 {
 
-                    arma::rowvec target_weight_sum_right = target_weight_sum - target_weight_sum_left;
+                    arma::vec target_weight_sum_right = target_weight_sum - target_weight_sum_left;
 
-                    arma::rowvec target_weight_avg_left = target_weight_sum_left / n_left;
-                    arma::rowvec target_weight_avg_right = target_weight_sum_right / n_right;
+                    arma::vec target_weight_avg_left = target_weight_sum_left / n_left;
+                    arma::vec target_weight_avg_right = target_weight_sum_right / n_right;
 
                     double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate,
                                                                                              decrease_left,

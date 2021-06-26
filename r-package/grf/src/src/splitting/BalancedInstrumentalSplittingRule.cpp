@@ -122,8 +122,9 @@ namespace grf
     std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
     double target_weight_penalty_rate = data.get_target_weight_penalty();
 
-    arma::rowvec target_weight_sum(num_target_weight_cols);
-    arma::mat target_weight_left_sum(num_samples, num_target_weight_cols);
+
+    arma::vec target_weight_sum(num_target_weight_cols);
+    arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); // column major
 
     //
 
@@ -149,7 +150,7 @@ namespace grf
   }
 
   void BalancedInstrumentalSplittingRule::find_best_split_value(const Data &data,
-                                                                size_t node, 
+                                                                size_t node,
                                                                 size_t var,
                                                                 size_t num_samples,
                                                                 double weight_sum_node,
@@ -165,7 +166,7 @@ namespace grf
                                                                 bool &best_send_missing_left,
                                                                 const Eigen::ArrayXXd &responses_by_sample,
                                                                 const std::vector<std::vector<size_t>> &samples,
-                                                                arma::rowvec &target_weight_sum,
+                                                                arma::vec &target_weight_sum,
                                                                 arma::mat &target_weight_left_sum,
                                                                 const std::string &target_weight_penalty_metric,
                                                                 const double &target_weight_penalty_rate)
@@ -232,7 +233,7 @@ namespace grf
         sums_z[split_index] += sample_weight * z;
         sums_z_squared[split_index] += sample_weight * z * z;
 
-        target_weight_left_sum.row(split_index) = target_weight_sum;
+        target_weight_left_sum.col(split_index) = target_weight_sum;
 
         if (z < mean_node_z)
         {
@@ -250,6 +251,7 @@ namespace grf
     }
 
     target_weight_sum += data.get_target_weight_row(var, sorted_samples[num_samples - 1]); // last sample is ignored
+ 
 
     size_t n_left = n_missing;
     double weight_sum_left = weight_sum_missing;
@@ -292,7 +294,7 @@ namespace grf
         sum_left += sums[i];
         sum_left_z += sums_z[i];
         sum_left_z_squared += sums_z_squared[i];
-        arma::rowvec target_weight_sum_left = target_weight_left_sum.row(i);
+        arma::vec target_weight_sum_left = target_weight_left_sum.col(i);
 
         // Skip this split if the left child does not contain enough
         // z values below and above the parent's mean.
@@ -344,10 +346,10 @@ namespace grf
         if (target_weight_penalty_rate > 0)
         {
 
-          arma::rowvec target_weight_sum_right = target_weight_sum - target_weight_sum_left;
+          arma::vec target_weight_sum_right = target_weight_sum - target_weight_sum_left;
 
-          arma::rowvec target_weight_avg_left = target_weight_sum_left / n_left;
-          arma::rowvec target_weight_avg_right = target_weight_sum_right / n_right;
+          arma::vec target_weight_avg_left = target_weight_sum_left / n_left;
+          arma::vec target_weight_avg_right = target_weight_sum_right / n_right;
 
           double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate,
                                                                                    decrease_left,

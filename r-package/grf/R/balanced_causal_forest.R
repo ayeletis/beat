@@ -225,14 +225,14 @@ balanced_causal_forest <- function(X,
         stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
     }
 
-      #output list : [dim(X)[2]] [[num rows, num target weight feature]]
+      #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
     target.avg.weights = construct_target_weight_mean(x = X,
                                                     z = target.weights,
                                                     num_breaks = target.weight.bins.breaks)
 
     # convert to 3d array: [dim(target weight), length(list)]
     target.avg.weights = array(unlist(target.avg.weights), dim=c(dim(target.avg.weights[[1]]), length(target.avg.weights)))
-
+    # print(dim(target.avg.weights))
       # check args
     clusters <- validate_clusters(clusters, X)
     samples.per.cluster <-
