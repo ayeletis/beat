@@ -23,6 +23,7 @@ License: GPL-3
 LinkingTo: RcppArmadillo, RcppEigen, Rcpp
 Imports:
 	data.table,
+	RcppArmadillo,
     DiceKriging,
     lmtest,
     Matrix,

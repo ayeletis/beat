@@ -24,7 +24,7 @@
 #include <sstream>
 #include <Eigen/Dense>
 #include "Data.h"
- #include "Arma/rcpparma" 
+#include "Arma/rcpparma"
 // [[Rcpp::depends(RcppArmadillo)]]
 namespace grf
 {

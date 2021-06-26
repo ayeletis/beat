@@ -10,33 +10,37 @@ used in balanced instrumental and regression splitting
 namespace grf
 {
 
-    double calculate_target_weight_penalty(double target_weight_penalty_rate,
-                                           double decrease_left,
-                                           double decrease_right,
-                                           arma::rowvec target_weight_avg_left,
-                                           arma::rowvec target_weight_avg_right,
-                                           std::string target_weight_penalty_metric)
+    double calculate_target_weight_penalty(const double &target_weight_penalty_rate,
+                                           const double &decrease_left,
+                                           const double &decrease_right,
+                                           const arma::rowvec &target_weight_avg_left,
+                                           const arma::rowvec &target_weight_avg_right,
+                                           const std::string &target_weight_penalty_metric)
     // return penalty for target weight imbalance
     {
         double imbalance = 0;
+        arma::vec target_left = arma::vectorise(target_weight_avg_left);
+        arma::vec target_right = arma::vectorise(target_weight_avg_right);
 
         // rate methods
         if (target_weight_penalty_metric == "split_l2_norm_rate")
-        {  
-            // arma::vec left =  target_weight_avg_left.as_col();
-            // arma::vec right = target_weight_avg_right.as_col();
-            imbalance = arma::norm(target_weight_avg_left, 2) * decrease_left + arma::norm(target_weight_avg_right, 2) * decrease_right;
+        {
+            //            double left = sqrt(arma::sum(arma::square(target_left)));
+            //            double right = sqrt(arma::sum(arma::square(target_right)));
+            //            imbalance = left * decrease_left + right * decrease_right;
+            imbalance = arma::norm(target_left, 2) * decrease_left + arma::norm(target_right, 2) * decrease_right;
         }
         else if (target_weight_penalty_metric == "euclidean_distance_rate")
         {
-            arma::rowvec gap = target_weight_avg_left - target_weight_avg_right;
-            imbalance = sqrt(arma::sum(gap % gap));
+
+            imbalance = arma::norm((target_left - target_right), 2);
             imbalance = (decrease_left + decrease_right) * imbalance;
         }
         else if (target_weight_penalty_metric == "cosine_similarity_rate")
         {
-            double upper = arma::sum((target_weight_avg_left % target_weight_avg_right));
-            double lower = sqrt(arma::sum(target_weight_avg_left % target_weight_avg_left)) * sqrt(arma::sum(target_weight_avg_right % target_weight_avg_right));
+
+            double upper = arma::sum((target_left % target_right));
+            double lower = arma::norm(target_left, 2) * arma::norm(target_right, 2);
 
             double cosine_similarity = upper / lower; //−1 = exactly opposite, 1 = exactly the same
             imbalance = 1 - cosine_similarity / 2;    // in [0, 1]
@@ -46,19 +50,17 @@ namespace grf
         // direct methods
         else if (target_weight_penalty_metric == "split_l2_norm")
         {
-            // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-            imbalance = arma::norm(target_weight_avg_left, 2) + arma::norm(target_weight_avg_right, 2);
+            imbalance = arma::norm(target_left, 2) + arma::norm(target_right, 2);
         }
         else if (target_weight_penalty_metric == "euclidean_distance")
-
         {
-            arma::rowvec gap = target_weight_avg_left - target_weight_avg_right;
-            imbalance = sqrt(arma::sum(gap % gap));
+            imbalance = arma::norm((target_left - target_right), 2);
         }
         else if (target_weight_penalty_metric == "cosine_similarity")
         {
-            double upper = arma::sum((target_weight_avg_left % target_weight_avg_right));
-            double lower = sqrt(arma::sum(target_weight_avg_left % target_weight_avg_left)) * sqrt(arma::sum(target_weight_avg_right % target_weight_avg_right));
+
+            double upper = arma::sum((target_left % target_right));
+            double lower = arma::norm(target_left, 2) * arma::norm(target_right, 2);
 
             double cosine_similarity = upper / lower; //−1 = exactly opposite, 1 = exactly the same
             imbalance = 1 - cosine_similarity / 2;    // in [0, 1]

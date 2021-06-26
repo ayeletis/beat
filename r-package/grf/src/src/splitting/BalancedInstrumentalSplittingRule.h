@@ -62,7 +62,9 @@ namespace grf
                                const Eigen::ArrayXXd &responses_by_sample,
                                const std::vector<std::vector<size_t>> &samples,
                                arma::rowvec &target_weight_sum,
-                               arma::mat &target_weight_left_sum);
+                               arma::mat &target_weight_left_sum,
+                               const std::string &target_weight_penalty_metric,
+                               const double &target_weight_penalty_rate);
 
     size_t *counter;
     double *weight_sums;

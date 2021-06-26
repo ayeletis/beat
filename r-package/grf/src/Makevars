@@ -1,10 +1,11 @@
 ## Use c++11
-SHLIB_OPENMP_CXXFLAGS = -lopenblas -lblas -llapack
-BLAS_LIBS = src/openblas
+##  -lblas -llapack if openblas if not available  -lopenblas  
+## BLAS_LIBS = OpenBLAS
+SHLIB_OPENMP_CXXFLAGS = -lblas -llapack
 CXX_STD = CXX11
 MAKEFLAGS = -j24
 PKG_CXXFLAGS = -I. -Isrc -DR_BUILD $(SHLIB_OPENMP_CXXFLAGS)
-PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS)  $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)  
+PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS)  $(LAPACK_LIBS)  $(BLAS_LIBS)  $(FLIBS)  
 SOURCES = $(wildcard *.cpp */*.cpp */*/*.cpp */*/*/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 MAKE=make -j24
