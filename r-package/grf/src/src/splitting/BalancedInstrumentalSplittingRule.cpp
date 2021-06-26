@@ -21,7 +21,7 @@
 #include "BalancedInstrumentalSplittingRule.h"
 #include <RcppEigen.h>
 #include "SplittingPenaltyMetric.h"
- #include "Arma/rcpparma" 
+#include "Arma/rcpparma"
 // [[Rcpp::depends(RcppArmadillo)]]
 namespace grf
 {
@@ -117,11 +117,18 @@ namespace grf
     double best_decrease = 0.0;
     bool best_send_missing_left = true;
 
+    // for target weight penalty
+    size_t num_target_weight_cols = data.get_num_target_weight_cols();
+    arma::rowvec target_weight_sum(num_target_weight_cols);
+    arma::mat target_weight_left_sum(num_samples, num_target_weight_cols);
+    //
+
     for (auto &var : possible_split_vars)
     {
       find_best_split_value(data, node, var, num_samples, weight_sum_node, sum_node, mean_z_node, num_node_small_z,
                             sum_node_z, sum_node_z_squared, min_child_size, best_value,
-                            best_var, best_decrease, best_send_missing_left, responses_by_sample, samples);
+                            best_var, best_decrease, best_send_missing_left, responses_by_sample, samples,
+                            target_weight_sum, target_weight_left_sum);
     }
 
     // Stop if no good split found
@@ -152,7 +159,9 @@ namespace grf
                                                                 double &best_decrease,
                                                                 bool &best_send_missing_left,
                                                                 const Eigen::ArrayXXd &responses_by_sample,
-                                                                const std::vector<std::vector<size_t>> &samples)
+                                                                const std::vector<std::vector<size_t>> &samples,
+                                                                arma::rowvec &target_weight_sum,
+                                                                arma::mat &target_weight_left_sum)
   {
     std::vector<double> possible_split_values;
     std::vector<size_t> sorted_samples;
@@ -173,6 +182,10 @@ namespace grf
     std::fill(sums_z, sums_z + num_splits, 0);
     std::fill(sums_z_squared, sums_z_squared + num_splits, 0);
 
+    // target weight penalty
+    target_weight_sum.fill(0);
+    target_weight_left_sum.fill(0);
+
     size_t n_missing = 0;
     double weight_sum_missing = 0;
     double sum_missing = 0;
@@ -181,19 +194,8 @@ namespace grf
     size_t num_small_z_missing = 0;
 
     // target weight penalty
-    size_t num_target_weight_cols = data.get_num_target_weight_cols();
     std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
     double target_weight_penalty_rate = data.get_target_weight_penalty();
-
-    // arma::rowvec target_weights_sum(num_samples, num_target_weight_cols);
-    arma::rowvec target_weight_sum(num_target_weight_cols);
-    target_weight_sum.fill(0);
-    arma::mat target_weight_left_sum(num_samples, num_target_weight_cols);
-    target_weight_left_sum.fill(0);
-    // for (size_t i = 0; i < num_samples; i++)
-    // {
-    //   out += data.get_target_weight_row(var, sorted_samples[i]);
-    // }
 
     size_t split_index = 0;
     for (size_t i = 0; i < num_samples - 1; i++)
@@ -244,7 +246,7 @@ namespace grf
       }
     }
 
-    target_weight_sum += data.get_target_weight_row(var, sorted_samples[num_samples-1]); // last sample is ignored
+    target_weight_sum += data.get_target_weight_row(var, sorted_samples[num_samples - 1]); // last sample is ignored
 
     size_t n_left = n_missing;
     double weight_sum_left = weight_sum_missing;

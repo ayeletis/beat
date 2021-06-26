@@ -4,7 +4,7 @@ used in balanced instrumental and regression splitting
 */
 #include <RcppEigen.h>
 #include "SplittingPenaltyMetric.h"
- #include "Arma/rcpparma" 
+#include "Arma/rcpparma"
 // [[Rcpp::depends(RcppArmadillo)]]
 
 namespace grf
@@ -22,8 +22,9 @@ namespace grf
 
         // rate methods
         if (target_weight_penalty_metric == "split_l2_norm_rate")
-        {
-
+        {  
+            // arma::vec left =  target_weight_avg_left.as_col();
+            // arma::vec right = target_weight_avg_right.as_col();
             imbalance = arma::norm(target_weight_avg_left, 2) * decrease_left + arma::norm(target_weight_avg_right, 2) * decrease_right;
         }
         else if (target_weight_penalty_metric == "euclidean_distance_rate")

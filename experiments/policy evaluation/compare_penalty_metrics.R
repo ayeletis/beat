@@ -133,18 +133,20 @@ X_test_demog = cbind(X_test,Z_test)
 #
 #
 # # regular tau -- no demographics
+# a = Sys.time()
 # fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
 #                          honesty = TRUE,
 #                          num.trees = num_trees,
 #                          tune.parameters='all',
 #                          seed=my_seed)
-
+#
+# print(Sys.time()-a)
 
 a = Sys.time()
 
 # regular tau -- no demographics
 fit_grf = balanced_causal_forest(X_train, Y_train, W_train,
-                       target.weights = as.matrix(Z_train),
+                       target.weights = as.matrix(Z_train ) ,
                        target.weight.penalty = 1,
                        target.weight.standardize = TRUE,
                        target.weight.bins.breaks = 256,
