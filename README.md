@@ -54,7 +54,8 @@ Y_train: [N, 1]
 
 Z_train: [N, N_z]
 
-Possible Distance Metrics:
+
+[Possible Distance Metrics](https://github.com/yu45020/grf/blob/master/r-package/grf/src/src/splitting/SplittingPenaltyMetric.cpp):
 
 
 * `split_l2_norm_rate`: (default) left, right: l2 norm(colmean target weight)* penalty rate * node decrease
