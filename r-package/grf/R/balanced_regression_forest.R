@@ -98,6 +98,7 @@ balanced_regression_forest <- function(X, Y,
                               target.weight.bins.breaks = 256,
                               target.weight.standardize = TRUE,
                               target.weight.penalty.metric = "split_l2_norm_rate",
+                              target.avg.weights = NULL,
                               clusters = NULL,
                               equalize.cluster.weights = FALSE,
                               sample.fraction = 0.5,
@@ -116,6 +117,8 @@ balanced_regression_forest <- function(X, Y,
                               compute.oob.predictions = TRUE,
                               num.threads = NULL,
                               seed = runif(1, 0, .Machine$integer.max)) {
+  # target.avg.weights: array, [num target weight, observation, num x]
+  # if null, create it internally
     has.missing.values <- validate_X(X, allow.na = TRUE)
     validate_sample_weights(sample.weights, X)
     Y <- validate_observations(Y, X)
@@ -146,9 +149,17 @@ balanced_regression_forest <- function(X, Y,
     if (!target.weight.penalty.metric %in% available_metrics) {
         stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
     }
-    #output list : [num x feture] [[num rows, num target weight feature]]
-    target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
-                                                    num_breaks = target.weight.bins.breaks)
+
+    if(is.null(target.avg.weights)){
+      target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,
+                                                        num_breaks = target.weight.bins.breaks)
+    }
+    stopifnot(is.array(target.avg.weights))
+    stopifnot(dim(target.avg.weights) == c(dim(target.weights)[2], dim(X)[1], dim(X)[2]))
+
+    #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
+    # then  convert to 3d array: [dim(target weight), length(list)]
+
     ##
 
 

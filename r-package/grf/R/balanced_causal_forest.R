@@ -153,6 +153,7 @@ balanced_causal_forest <- function(X,
                           target.weight.bins.breaks = 256,
                           target.weight.standardize = TRUE,
                           target.weight.penalty.metric = "split_l2_norm_rate",
+                          target.avg.weights = NULL,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
                           sample.fraction = 0.5,
@@ -173,6 +174,7 @@ balanced_causal_forest <- function(X,
                           orthog.boosting = FALSE,
                           num.threads = NULL,
                           seed = runif(1, 0, .Machine$integer.max)) {
+
     # :----  procedure ---:
     # 1. check input data
     # 2. get list of target weights: per column of X, bin X and get column-wise average of target weight
@@ -188,6 +190,10 @@ balanced_causal_forest <- function(X,
     # 5. fit actual balanced_calsal_forest
     # +++++++++++++++++++++
     # to make penalty tunable, change tune_balance_causal_forest.R and tunning_balanced.R
+
+    # target.avg.weights: array, [num target weight, observation, num x]
+    # if null, create it internally
+
 
     # check input data
     has.missing.values <- validate_X(X, allow.na = TRUE)
@@ -226,13 +232,16 @@ balanced_causal_forest <- function(X,
     }
 
       #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
-    target.avg.weights = construct_target_weight_mean(x = X,
-                                                    z = target.weights,
-                                                    num_breaks = target.weight.bins.breaks)
+    # then  convert to 3d array: [dim(target weight), length(list)]
+    if(is.null(target.avg.weights)){
+      target.avg.weights = construct_target_weight_mean(x = X,
+                                                        z = target.weights,
+                                                        num_breaks = target.weight.bins.breaks)
+    }
+    stopifnot(is.array(target.avg.weights))
+    stopifnot(dim(target.avg.weights) == c(dim(target.weights)[2], dim(X)[1], dim(X)[2]))
 
-    # convert to 3d array: [dim(target weight), length(list)]
-    target.avg.weights = array(unlist(target.avg.weights), dim=c(dim(target.avg.weights[[1]]), length(target.avg.weights)))
-    # print(dim(target.avg.weights))
+
       # check args
     clusters <- validate_clusters(clusters, X)
     samples.per.cluster <-
@@ -310,23 +319,6 @@ balanced_causal_forest <- function(X,
     for (i in remove_args) {
         args.target[i] = NULL
     }
-    # not used
-    # if(sum(abs(target.weights))>0){
-    #   if (is.null(target.weights.hat) && !orthog.boosting) {
-    #     forest.weight <- do.call(multi_regression_forest, c(Y = list(target.weights), args.target))
-    #     target.weights.hat <- predict(forest.weight)$predictions
-    #   } else if (is.null(target.weights.hat) && orthog.boosting) {
-    #     forest.weight <-
-    #       do.call(boosted_regression_forest, c(Y = list(target.weights), args.target))
-    #     target.weights.hat <- predict(forest.weight)$predictions
-    #   } else if (length(target.weights.hat) == 1) {
-    #     target.weights.hat <- rep(target.weights.hat, nrow(X))
-    #   } else if (length(target.weights.hat) != nrow(X)) {
-    #     stop("Target weight has incorrect length.")
-    #   }
-    # }else{
-    #   target.weights.hat = target.weights
-    # }
 
     Y.centered <- Y - Y.hat
     W.centered <- W - W.hat

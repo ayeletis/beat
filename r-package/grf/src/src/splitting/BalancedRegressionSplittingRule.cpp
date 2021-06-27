@@ -81,10 +81,11 @@ namespace grf
 
         // for target weight penalty
         size_t num_target_weight_cols = data.get_num_target_weight_cols();
-        arma::vec target_weight_sum(num_target_weight_cols);
-        arma::mat target_weight_left_sum(num_samples, num_target_weight_cols); //column major 
         std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
         double target_weight_penalty_rate = data.get_target_weight_penalty();
+        
+        arma::vec target_weight_sum(num_target_weight_cols);
+        arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); //column major
         //
 
         // For all possible split variables

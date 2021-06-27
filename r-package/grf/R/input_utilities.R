@@ -321,6 +321,7 @@ standardize = function(x){
   }
 }
 
+#' @export
 construct_target_weight_mean = function(x, z, num_breaks = 256) {
   calculate_avg = function(dat, x_col, z_col, num_breaks) {
     df = dat[, .SD, .SDcols = c(x_col, z_col)]
@@ -349,6 +350,8 @@ construct_target_weight_mean = function(x, z, num_breaks = 256) {
     out[[i]] = t(x_z) # arma::mat is column base
   }
 
-  return(out)
+  target.avg.weights = array(unlist(out), dim=c(dim(out[[1]]), length(out)))
+
+  return(target.avg.weights)
 }
 

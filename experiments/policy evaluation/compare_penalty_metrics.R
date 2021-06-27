@@ -3,6 +3,10 @@
   library(ggpubr)
   library(ggnewscale)
 
+  library(fst)
+  library(directlabels)
+  library(ggforce)
+  library(grf)
 
 
   source("functions_off_policy_evaluation.R")
@@ -124,74 +128,38 @@ X_test_demog = cbind(X_test,Z_test)
 #            Estimate TAUs
 # ----------------------------------------------------------------
 
-# demographic tau
-# fit_grf_demog <- causal_forest(X = X_train_demog, Y = Y_train, W = W_train,
-#                                honesty = TRUE,
-#                                num.trees = num_trees,
-#                                tune.parameters='all',
-#                                seed=my_seed)
-#
-#
-# # regular tau -- no demographics
-# a = Sys.time()
-fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
-                         honesty = TRUE,
-                         num.trees = num_trees,
-                         tune.parameters='all',
-                         seed=my_seed)
-#
-# print(Sys.time()-a)
-
-a = Sys.time()
-
-# regular tau -- no demographics
-fit_grf = balanced_causal_forest(X_train, Y_train, W_train,
-                       target.weights = as.matrix(Z_train ) ,
-                       target.weight.penalty = 1,
-                       target.weight.standardize = TRUE,
-                       target.weight.bins.breaks = 256,
-                       # target.weight.penalty.metric = 'cosine_similarity_rate',
-                       honesty = TRUE,
-                       # num.threads = 1,
-                       num.trees = num_trees,
-                       tune.parameters=my_tunable_params,
-                       seed=my_seed)
-print(Sys.time()-a)
 
 
-library(microbenchmark)
-microbenchmark(
-  out <- balanced_causal_forest(X_train, Y_train, W_train,
-                                target.weights = as.matrix(Z_train ) ,
-                                target.weight.penalty = 1,
-                                target.weight.standardize = TRUE,
-                                target.weight.bins.breaks = 256,
-                                # target.weight.penalty.metric = 'cosine_similarity_rate',
-                                honesty = TRUE,
-                                # num.threads = 1,
-                                num.trees = num_trees,
-                                tune.parameters=my_tunable_params,
-                                seed=my_seed),
-  times = 10
-)
-
-microbenchmark(
-  out <- fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
-                                  honesty = TRUE,
-                                  num.trees = num_trees,
-                                  tune.parameters='all',
-                                  seed=my_seed),
-  times = 10
-)
+# out = balanced_causal_forest(X_train, Y_train, W_train,
+#                                 target.weights = as.matrix(Z_train ) ,
+#                                 target.weight.penalty = 2,
+#                                 target.weight.standardize = TRUE,
+#                                 target.weight.bins.breaks = 256,
+#                                 target.weight.penalty.metric = 'cosine_similarity_rate',
+#                                 honesty = TRUE,
+#                                 # num.threads = 1,
+#                                 num.trees = num_trees,
+#                                 tune.parameters=my_tunable_params,
+#                                 seed=my_seed)
+# out_pred = predict(out)
 
 
-# ================================================================
-#    Estimate BEAT for different PENALTY and different TARGET_RATE
-# ----------------------------------------------------------------
-library(fst)
-library(ggnewscale)
-library(directlabels)
-library(ggforce)
+
+# library(microbenchmark)
+# microbenchmark(
+#   out <- balanced_causal_forest(X_train, Y_train, W_train,
+#                                 target.weights = as.matrix(Z_train ) ,
+#                                 target.weight.penalty = 1,
+#                                 target.weight.standardize = TRUE,
+#                                 target.weight.bins.breaks = 256,
+#                                 target.weight.penalty.metric = 'cosine_similarity_rate',
+#                                 honesty = TRUE,
+#                                 # num.threads = 1,
+#                                 num.trees = num_trees,
+#                                 tune.parameters=my_tunable_params,
+#                                 seed=my_seed),
+#   times = 10
+# )
 
 
 available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean target weight)* penalty rate * node decrease
@@ -203,6 +171,11 @@ available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean targe
                       "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
 )
 
+# pre build the array to save time
+# target.avg.weights = construct_target_weight_mean(x = X_train,
+#                                                   z = as.matrix(Z_train),
+#                                                   num_breaks = 256)
+
 
 # Function that selects targets based on tau_pred
 target_tau_proportion  = function(tau_pred, target_rate){
@@ -212,13 +185,14 @@ target_tau_proportion  = function(tau_pred, target_rate){
 # Function that runs BEAT for different levels of penalty -- returns TAUs
 estimate_taus_per_penalty = function(penalty_value, metric){
 # this following copied from codes above and recycle the same parameters
-  print(penalty_value)
+  print(sprintf("Penalty rate: %s", penalty_value))
   fit_fair <- balanced_causal_forest(X_train, Y_train, W_train,
                                      target.weights = as.matrix(Z_train),
                                      target.weight.penalty = penalty_value,
                                      target.weight.standardize = TRUE,
                                      target.weight.bins.breaks = 256,
                                      target.weight.penalty.metric = metric,
+                                     #target.avg.weights =  target.avg.weights,
                                      honesty = TRUE,
                                      num.trees = num_trees,
                                      tune.parameters=my_tunable_params,
@@ -242,27 +216,76 @@ estimate_taus_per_penalty = function(penalty_value, metric){
 }
 
 ## Set range for penalty
-penalty_vect = c(0.1, 0.5, 1, 1.5, 2, 3)   #c(seq(0.1,0.7,0.1),seq(0.8, 1.4, 0.02),seq(1.5,3,0.5))
+penalty_vect =c( seq(0.1, 2,0.2), 2.5, 3)
+
+available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean target weight)* penalty rate * node decrease
+                      "euclidean_distance_rate", # (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
+                      "cosine_similarity_rate", # (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
+                      "split_l2_norm", #  sum(left,right l2 norm(colmean target weight))* penalty rate
+                      "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
+                      "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
+)
 
 taus_per_penalty = list()
-
 for(i in available_metrics){
   a = Sys.time()
-    print(i)
-  taus_per_penalty[[i]] = rbindlist(lapply(penalty_vect, estimate_taus_per_penalty, metric=i))
+  print(i)
+  out = rbindlist(lapply(penalty_vect, estimate_taus_per_penalty, metric=i))
+  taus_per_penalty[[i]] = out
   print(Sys.time()-a)
 }
 
 
+taus_per_penalty = rbindlist(taus_per_penalty)
 
-write_fst(taus_per_penalty, "cache_tau_per_penalty.fst")
+write_fst(taus_per_penalty, "cache_tau_per_penalty_metric.fst")
 taus_per_penalty = read_fst('cache_tau_per_penalty.fst', as.data.table = TRUE)
+
+# ================================================================
+#            Benchmark
+# ----------------------------------------------------------------
+
+# demographic tau
+fit_grf_demog <- causal_forest(X = X_train_demog, Y = Y_train, W = W_train,
+                               honesty = TRUE,
+                               num.trees = num_trees,
+                               tune.parameters='all',
+                               seed=my_seed)
+
+
+# regular tau -- no demographics
+
+fit_grf <- causal_forest(X = X_train, Y = Y_train, W = W_train,
+                         honesty = TRUE,
+                         num.trees = num_trees,
+                         tune.parameters='all',
+                         seed=my_seed)
+## Predict TAUs
+set.seed(my_seed) # we fix seed for the random prediction
+{
+  ## Get score predictions
+  tau.pred = list(
+    'grf_demog' = list(
+      'train' = predict(fit_grf_demog)$predictions,
+      'test' = predict(fit_grf_demog, X_test_demog)$predictions
+    ),
+    'grf' = list(
+      'train' = predict(fit_grf)$predictions,
+      'test' = predict(fit_grf, X_test)$predictions
+    ),
+    'random' =  list(
+      'train' = runif(length(Y_train),min(predict(fit_grf)$predictions),max(predict(fit_grf)$predictions)),
+      'test' = runif(length(Y_test),min(predict(fit_grf)$predictions),max(predict(fit_grf)$predictions))
+    )
+  )
+} # end of predict taus
 
 
 # ================================================================
 #   Collect policy results per target_rate levels -- both for the benchmarks and for BEAT penalty
 # ----------------------------------------------------------------
-
+W.hat_train = mean(W_train) # We use prop(treatment) because the data comes from an experiment
+W.hat_test = mean(W_test)
 # Function that collects policy results per target vector using BEAT by penalty
 collect_penalty_results = function(target_vector, data_type="train"){
   if(data_type=="train"){
@@ -327,7 +350,8 @@ collect_benchmark_results = function(target_rate){
 }
 
 
-foo = NULL
+dat_result_list = list()
+count = 1
 for(target_rate in c(0.2,0.4,0.5,0.6,0.8)){
 
   ## 1.- Collect results of "per_penalty", by different target rates
@@ -343,17 +367,18 @@ for(target_rate in c(0.2,0.4,0.5,0.6,0.8)){
   # Collect results per data type
   results_penalty_train = taus_per_penalty[data_type=="train",
                                   collect_penalty_results(is_targeted,"train"),
-                            by=.(penalty_rate )]
+                            by=.(penalty_rate, penalty_metric )]
   results_penalty_test = taus_per_penalty[data_type=="test",
                                   collect_penalty_results(is_targeted,"test"),
-                                  by=.(penalty_rate )]
+                                  by=.(penalty_rate, penalty_metric )]
 
   results_penalty = rbind(results_penalty_train, results_penalty_test)
 
-  results_penalty_m = melt(results_penalty, id.vars = c("penalty_rate",'data_type','policy_name'),
+  results_penalty_m = melt(results_penalty, id.vars = c("penalty_rate",'data_type','policy_name', "penalty_metric"),
                        measure.vars = c("ipw",
                                         "ate_targeted",
                                         "ate_non_targeted",
+                                        'target_weight_imbalance',
                                         "target_weight_imbalance_per_dim.Z.V1"
                        ))
   results_penalty_m[, value := as.numeric(value)]
@@ -367,120 +392,85 @@ for(target_rate in c(0.2,0.4,0.5,0.6,0.8)){
                                measure.vars = c("ipw",
                                                 "ate_targeted",
                                                 "ate_non_targeted",
+                                                'target_weight_imbalance',
                                                 "target_weight_imbalance_per_dim.Z.V1"
                                ))
 
   ## 3.- Combine and prepare results
-  results_all = rbind(results_penalty,results_benchmarks)
-  results_all_m = melt(results_all, id.vars = c("penalty_rate",'data_type','policy_name'),
+  results_all = rbindlist(list(results_penalty,results_benchmarks), use.names = TRUE, fill = TRUE)
+  results_all_m = melt(results_all, id.vars = c("penalty_rate",'data_type','policy_name','penalty_metric'),
                               measure.vars = c("ipw",
                                                "ate_targeted",
                                                "ate_non_targeted",
+                                               'target_weight_imbalance',
                                                "target_weight_imbalance_per_dim.Z.V1"
                               ))
 
   results_all_m[, value := as.numeric(value)]
-
-
+  results_all[, target_rate := target_rate]
+  dat_result_list[[count]] = results_all
+  count = count+1
   # cache output data
-  out_target_rate = results_all[,.(target_rate = target_rate,
-                           data_type, penalty_rate,policy_name, ipw,ate_targeted,
-                           imbalance_Z1 = target_weight_imbalance_per_dim.Z.V1)]
+  # out_target_rate = results_all[,.(target_rate = target_rate,
+  #                          data_type, penalty_rate,policy_name, ipw,ate_targeted,
+  #
+  #                          imbalance_Z1 = target_weight_imbalance_per_dim.Z.V1)]
 
-  foo = rbind(out_target_rate,foo)
+  # foo = rbind(out_target_rate,foo)
 }
-policy_results = foo
 
-setwd(dir_output)
-write_fst(policty_results, "cache_policy_results.fst")
-policy_results = read_fst('cache_policy_results.fst', as.data.table = TRUE)
-
+dat_reulst = rbindlist(dat_result_list, use.names = TRUE)
+write_fst(dat_reulst, "cache_policy_results_metric.fst")
 
 
 
 # ================================================================
-#    PLOTS
+#            Plots
 # ----------------------------------------------------------------
-# converte to numeric
-policy_results[, ipw:= as.numeric(ipw)]
-policy_results[, ate_targeted:= as.numeric(ate_targeted)]
-policy_results[, imbalance_Z1:= as.numeric(imbalance_Z1)]
+# 1. results vs penalty (color metric)
 
+# when penalty rate > 1.5 for cosine similarity rate , predicted tau in [0.01, 0.015]
+# so some points are NA
+target_rate_plot = 0.2
+dat_reulst = read_fst("cache_policy_results_metric.fst", as.data.table = TRUE)
+dat_reulst_m = melt(dat_reulst, id.vars = c("penalty_rate",'data_type','policy_name','penalty_metric','target_rate'),
+                    measure.vars = c("ipw",
+                                     "ate_targeted",
+                                     "ate_non_targeted",
+                                     'target_weight_imbalance',
+                                     "target_weight_imbalance_per_dim.Z.V1"
+                    ))
+dat_reulst_m[, value := as.numeric(value) ]
+ggscatter(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot & data_type=='test'],
+       x='penalty_rate',
+       y="value",
+       add='loess',
+       # plot_type = 'p',
+       xlab="Penalty Rate",
+       color="penalty_metric",
+       title='Comparison of Distance Metrics Per Penalty Rate On Test Data',
+       subtitle = sprintf('Target rate: %s; points are smoothed by loess', target_rate_plot),
+       facet.by = c("variable" ),
+       scales='free_y')
+ggsave("benchmark_metrics_penalty_rate_test_data.png", width=14, height=10)
 
-policy_results_m = melt(policy_results,
-                        id.vars = c("target_rate", 'penalty_rate',"data_type", "policy_name") )
-policy_results_m[, value:= as.numeric(value)]
-## by target rate
-my_target_rate = 0.2
-data_to_plot = policy_results_m[target_rate==my_target_rate]
-results_benchmarks_m = data_to_plot[policy_name!="balanced_grf"]
-results_benchmarks_m[, line_color := paste0(policy_name,'-',data_type)]
+# 2. ipw vs penalty rate (color metric and target rate)
 
-### HENGYU, Could you please recreate your plots, from here on, using policy_results??
-# line plots for penalty rate
+dat_reulst[, imbalance_z1:= as.numeric(target_weight_imbalance_per_dim.Z.V1)]
+dat_reulst[, ate_targeted:= as.numeric(ate_targeted)]
+setorder(dat_reulst, imbalance_z1)
 
-   p = ggline(data_to_plot[policy_name=="balanced_grf"],
-         x = "penalty_rate",
-         y = "value",
-         facet.by=c( "variable"),
-         color="data_type",
-         shape = "data_type",
-         numeric.x.axis = TRUE,
-         scale = "free_y",
-         legend='bottom',
-         title="Targeting Policy Evaluation on Penalty Rate for Balanced GRF",
-         subtitle=sprintf("Z.V1 is correlated with X; Target Rate: %s", my_target_rate),
-         ncol=2
-  ) + grids() +
-    coord_cartesian(xlim=c(0.8, 1.5)) + scale_color_brewer(palette="Set1") +
-    scale_x_continuous(breaks=seq(0.8, 2, 0.05))  +
-    new_scale_color()  + scale_color_brewer(palette="Set1") +
-    geom_hline(data=results_benchmarks_m,
-               mapping=aes(yintercept=value,color=data_type, linetype=policy_name      )
-               )
-    # we include too much text and hard to read
-    # geom_text(data=results_benchmarks_m,
-    #           mapping=aes(x=1, y=value, label=policy_name),
-    #           position = position_jitter(seed=1, width=0.1, height = 0))
-    #
-
-  ggsave(sprintf("target_policy_penalty_rate_balanced_grf_target_rate_%s.png", my_target_rate), p,
-         width = 14, height=10)
-
-
-  # plot per target rate
-  # last point per group
-
-  point_annot_dat = policy_results[target_rate==my_target_rate,
-                                   lapply(.SD, tail, n=1),
-                                   by=.(policy_name, data_type)]
-  main_points = policy_results[ target_rate==my_target_rate & policy_name=="balanced_grf"]
-  benchmark_points = policy_results[ target_rate==my_target_rate &  policy_name!="balanced_grf"]
-  #
-  p_cont =  ggline(data=main_points,
-         x = "imbalance_Z1",
-         y = "ate_targeted",
-         color = "data_type",
-         palette = "Set1",
-         size=1,
-         numeric.x.axis = TRUE,
-         legend="top",
-         xlab = "Imbalance Z1",
-         ylab = 'Ate Targeted',
-         title="Ate Targeted VS Imbalance Z1",
-         subtitle=sprintf("Target rate: %s; Z1 is correlated to X", my_target_rate),
-         shape='policy_name') +
-    geom_point(data=point_annot_dat,
-               mapping=aes(x=imbalance_Z1, y=ate_targeted,
-                           color=data_type,
-                           shape=policy_name ),
-               size=3)   +
-   geom_text(data=point_annot_dat[data_type=='train'],
-             mapping=aes(x=imbalance_Z1, y=ate_targeted, label=policy_name),
-             position = position_nudge())
-
-  ggsave(sprintf("line_plot_ate_vs_imbalance_z1_target_rate_%s.png", my_target_rate), p_cont,
-         width = 12, height=10)
-
-
-
+ggscatter(data=dat_reulst[!is.na(penalty_metric) & target_rate == target_rate_plot],
+          x = "imbalance_z1",
+          y = "ate_targeted",
+       numeric.x.axis = TRUE,
+          color="data_type",
+          add = 'loess',
+          title='Comparison of Distance Metrics On All Penalty Rate',
+          subtitle = sprintf('Target rate: %s; points are smoothed by loess', target_rate_plot),
+          xlab = "Imbalance Z1",
+          ylab = 'Ate Targeted',
+       facet.by = 'penalty_metric',
+       scales='free'
+       )
+ggsave("benchmark_metrics_imbalance_ate.png", width=14, height=10)
