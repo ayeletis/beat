@@ -6,7 +6,6 @@
   library(fst)
   library(directlabels)
   library(ggforce)
-  library(grf)
 
 
   source("functions_off_policy_evaluation.R")
@@ -441,10 +440,11 @@ dat_reulst_m = melt(dat_reulst, id.vars = c("penalty_rate",'data_type','policy_n
                                      "target_weight_imbalance_per_dim.Z.V1"
                     ))
 dat_reulst_m[, value := as.numeric(value) ]
-ggscatter(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot & data_type=='test'],
+ggline(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot & data_type=='test'],
        x='penalty_rate',
        y="value",
-       add='loess',
+       numeric.x.axis = TRUE,
+       #add='loess',
        # plot_type = 'p',
        xlab="Penalty Rate",
        color="penalty_metric",
@@ -460,12 +460,12 @@ dat_reulst[, imbalance_z1:= as.numeric(target_weight_imbalance_per_dim.Z.V1)]
 dat_reulst[, ate_targeted:= as.numeric(ate_targeted)]
 setorder(dat_reulst, imbalance_z1)
 
-ggscatter(data=dat_reulst[!is.na(penalty_metric) & target_rate == target_rate_plot],
+ggline(data=dat_reulst[!is.na(penalty_metric) & target_rate == target_rate_plot],
           x = "imbalance_z1",
           y = "ate_targeted",
        numeric.x.axis = TRUE,
           color="data_type",
-          add = 'loess',
+          #add = 'loess',
           title='Comparison of Distance Metrics On All Penalty Rate',
           subtitle = sprintf('Target rate: %s; points are smoothed by loess', target_rate_plot),
           xlab = "Imbalance Z1",
