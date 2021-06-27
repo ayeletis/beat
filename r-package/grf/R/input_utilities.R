@@ -321,21 +321,15 @@ standardize = function(x){
   }
 }
 
+#' @export
 construct_target_weight_mean = function(x, z, num_breaks = 256) {
   calculate_avg = function(dat, x_col, z_col, num_breaks) {
     df = dat[, .SD, .SDcols = c(x_col, z_col)]
     df[, cut_bins := cut(get(x_col), breaks=num_breaks)]
-    # if(isTRUE(demean)){
-    #   df[, (z_col) := get(z_col) - mean(get(z_col))]
-    # }
+
     df[, mean_value := mean(get(z_col)), by = cut_bins]
     out = df[, mean_value]
-    # out = df[, mean_value] # if z is orthogonal (z hat)
-    # if(isTRUE(demean)){
-    #   out = df[, mean_value - mean(mean_value)]
-    # }else{
-    #   out = df[, mean_value]
-    # }
+
     return(out)
   }
 
@@ -351,9 +345,13 @@ construct_target_weight_mean = function(x, z, num_breaks = 256) {
   # output matrix: 3D [var, n, z]
   out = vector('list', length = length(x_cols))
   for (i in 1:length(x_cols)) {
-    out[[i]] = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
+    #  [# observation, # z columns], sapply combine by columns
+    x_z = sapply(z_cols, calculate_avg, x_col = x_cols[i], num_breaks = num_breaks, dat=dat)
+    out[[i]] = t(x_z) # arma::mat is column base
   }
 
-  return(out)
+  target.avg.weights = array(unlist(out), dim=c(dim(out[[1]]), length(out)))
+
+  return(target.avg.weights)
 }
 

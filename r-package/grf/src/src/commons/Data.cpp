@@ -22,11 +22,10 @@
 #include <iterator>
 #include <stdexcept>
 #include <sstream>
-#include <Rcpp.h>
-#include <RcppEigen.h>
 #include <Eigen/Dense>
 #include "Data.h"
-
+#include "Arma/rcpparma"
+// [[Rcpp::depends(RcppArmadillo)]]
 namespace grf
 {
 
@@ -216,19 +215,29 @@ namespace grf
   //   this->target_avg_weights = target_avg_weights;
   // }
 
-  void Data::set_target_avg_weights(Rcpp::List x)
+  // void Data::set_target_avg_weights(Rcpp::List x)
+  // {
+
+  //   std::vector<Eigen::MatrixXd> out(x.size());
+
+  //   for (int i; i < x.size(); i++)
+  //   {
+  //     Rcpp::NumericMatrix M = x[i];
+  //     Eigen::MatrixXd MS = Rcpp::as<Eigen::MatrixXd>(M);
+
+  //     out[i] = MS;
+  //   }
+  //   this->target_avg_weights = out;
+  //   Rcpp::NumericMatrix M = x[0];
+  //   // this->num_target_weight_cols = M.cols();
+  //   set_num_target_weight_cols(M.cols());
+  // }
+
+  void Data::set_target_avg_weights(arma::cube x)
   {
-
-    std::vector<Eigen::MatrixXd> out(x.size());
-
-    for (int i; i < x.size(); i++)
-    {
-      Rcpp::NumericMatrix M = x[i];
-      Eigen::MatrixXd MS = Rcpp::as<Eigen::MatrixXd>(M);
-
-      out[i] = MS;
-    }
-    this->target_avg_weights = out;
+    // input data is R array [num target weights, num obs, num x columns]
+    this->target_avg_weights = x;
+    Data::set_num_target_weight_cols(x.n_rows);
   }
 
   void Data::set_target_weight_penalty(double target_weight_penalty)
@@ -240,7 +249,10 @@ namespace grf
   {
     this->target_weight_penalty_metric = metric_type;
   }
-
+  void Data::set_num_target_weight_cols(size_t num_cols)
+  {
+    this->num_target_weight_cols = num_cols;
+  }
   //----  get methods start from here -----
   void Data::get_all_values(std::vector<double> &all_values,
                             std::vector<size_t> &sorted_samples,
@@ -362,14 +374,19 @@ namespace grf
   //   return out.row(row);
   // }
 
-  Eigen::MatrixXd Data::get_target_avg_weights(size_t var)
+  arma::vec Data::get_target_weight_row(size_t x_var, size_t sample_id) const
   {
-    return target_avg_weights[var];
+    // matrix in arma is column-major
+    return target_avg_weights.slice(x_var).col(sample_id);
   }
 
   double Data::get_target_weight_penalty() const
   {
     return target_weight_penalty;
+  }
+  size_t Data::get_num_target_weight_cols() const
+  {
+    return num_target_weight_cols;
   }
 
   std::string Data::get_target_weight_penalty_metric() const

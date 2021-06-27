@@ -20,6 +20,9 @@
 #include <Rcpp.h>
 #include "BalancedInstrumentalSplittingRule.h"
 #include <RcppEigen.h>
+#include "SplittingPenaltyMetric.h"
+#include "Arma/rcpparma"
+// [[Rcpp::depends(RcppArmadillo)]]
 namespace grf
 {
 
@@ -114,11 +117,23 @@ namespace grf
     double best_decrease = 0.0;
     bool best_send_missing_left = true;
 
+    // for target weight penalty
+    size_t num_target_weight_cols = data.get_num_target_weight_cols();
+    std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
+    double target_weight_penalty_rate = data.get_target_weight_penalty();
+
+
+    arma::vec target_weight_sum(num_target_weight_cols);
+    arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); // column major
+
+    //
+
     for (auto &var : possible_split_vars)
     {
       find_best_split_value(data, node, var, num_samples, weight_sum_node, sum_node, mean_z_node, num_node_small_z,
                             sum_node_z, sum_node_z_squared, min_child_size, best_value,
-                            best_var, best_decrease, best_send_missing_left, responses_by_sample, samples);
+                            best_var, best_decrease, best_send_missing_left, responses_by_sample, samples,
+                            target_weight_sum, target_weight_left_sum, target_weight_penalty_metric, target_weight_penalty_rate);
     }
 
     // Stop if no good split found
@@ -135,7 +150,8 @@ namespace grf
   }
 
   void BalancedInstrumentalSplittingRule::find_best_split_value(const Data &data,
-                                                                size_t node, size_t var,
+                                                                size_t node,
+                                                                size_t var,
                                                                 size_t num_samples,
                                                                 double weight_sum_node,
                                                                 double sum_node,
@@ -149,7 +165,11 @@ namespace grf
                                                                 double &best_decrease,
                                                                 bool &best_send_missing_left,
                                                                 const Eigen::ArrayXXd &responses_by_sample,
-                                                                const std::vector<std::vector<size_t>> &samples)
+                                                                const std::vector<std::vector<size_t>> &samples,
+                                                                arma::vec &target_weight_sum,
+                                                                arma::mat &target_weight_left_sum,
+                                                                const std::string &target_weight_penalty_metric,
+                                                                const double &target_weight_penalty_rate)
   {
     std::vector<double> possible_split_values;
     std::vector<size_t> sorted_samples;
@@ -170,31 +190,16 @@ namespace grf
     std::fill(sums_z, sums_z + num_splits, 0);
     std::fill(sums_z_squared, sums_z_squared + num_splits, 0);
 
+    // target weight penalty
+    target_weight_sum.fill(0.0);
+    target_weight_left_sum.fill(0.0);
+
     size_t n_missing = 0;
     double weight_sum_missing = 0;
     double sum_missing = 0;
     double sum_z_missing = 0;
     double sum_z_squared_missing = 0;
     size_t num_small_z_missing = 0;
-
-    // target weight penalty
-    double target_weight_penalty_rate = data.get_target_weight_penalty();
-    Eigen::MatrixXd target_avg_weights = data.target_avg_weights[var]; //data.get_target_avg_weights(var);
-
-    Eigen::MatrixXd target_avg_weights_sorted(num_samples, target_avg_weights.cols());
-
-    if (target_weight_penalty_rate > 0)
-    {
-      for (size_t i = 0; i < num_samples; i++)
-      {
-        target_avg_weights_sorted.row(i) = target_avg_weights.row(sorted_samples[i]);
-      }
-    }
-    // cache: column-wise sum
-    Eigen::VectorXd target_weights_sum = target_avg_weights_sorted.colwise().sum();
-
-    std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
-    // std::cout << "var: " << var << "; penalty:" << target_weight_penalty_rate << "; sorted max: " << target_avg_weights_sorted.sum() << "\n";
 
     size_t split_index = 0;
     for (size_t i = 0; i < num_samples - 1; i++)
@@ -204,6 +209,7 @@ namespace grf
       double sample_value = data.get(sample, var);
       double z = data.get_instrument(sample);
       double sample_weight = data.get_weight(sample);
+      target_weight_sum += data.get_target_weight_row(var, sorted_samples[i]);
 
       if (std::isnan(sample_value))
       {
@@ -226,6 +232,9 @@ namespace grf
 
         sums_z[split_index] += sample_weight * z;
         sums_z_squared[split_index] += sample_weight * z * z;
+
+        target_weight_left_sum.col(split_index) = target_weight_sum;
+
         if (z < mean_node_z)
         {
           ++num_small_z[split_index];
@@ -240,6 +249,9 @@ namespace grf
         ++split_index;
       }
     }
+
+    target_weight_sum += data.get_target_weight_row(var, sorted_samples[num_samples - 1]); // last sample is ignored
+ 
 
     size_t n_left = n_missing;
     double weight_sum_left = weight_sum_missing;
@@ -282,6 +294,7 @@ namespace grf
         sum_left += sums[i];
         sum_left_z += sums_z[i];
         sum_left_z_squared += sums_z_squared[i];
+        arma::vec target_weight_sum_left = target_weight_left_sum.col(i);
 
         // Skip this split if the left child does not contain enough
         // z values below and above the parent's mean.
@@ -332,18 +345,18 @@ namespace grf
         // penalize splits by target weights
         if (target_weight_penalty_rate > 0)
         {
-          Eigen::VectorXd target_weights_sum_left = target_avg_weights_sorted.topRows(n_left).colwise().sum();
-          Eigen::VectorXd target_weights_sum_right = target_weights_sum - target_weights_sum_left;
 
-          Eigen::VectorXd target_weights_avg_left = target_weights_sum_left / n_left;
-          Eigen::VectorXd target_weights_avg_right = target_weights_sum_right / n_left;
+          arma::vec target_weight_sum_right = target_weight_sum - target_weight_sum_left;
+
+          arma::vec target_weight_avg_left = target_weight_sum_left / n_left;
+          arma::vec target_weight_avg_right = target_weight_sum_right / n_right;
 
           double imbalance_target_weight_penalty = calculate_target_weight_penalty(target_weight_penalty_rate,
-                                                                                   decrease_left = decrease_left,
-                                                                                   decrease_right = decrease_right,
-                                                                                   target_weights_avg_left = target_weights_avg_left,
-                                                                                   target_weights_avg_right = target_weights_avg_right,
-                                                                                   target_weight_penalty_metric = target_weight_penalty_metric);
+                                                                                   decrease_left,
+                                                                                   decrease_right,
+                                                                                   target_weight_avg_left,
+                                                                                   target_weight_avg_right,
+                                                                                   target_weight_penalty_metric);
 
           decrease -= imbalance_target_weight_penalty;
         }
@@ -360,37 +373,5 @@ namespace grf
       }
     }
   }
-
-  double calculate_target_weight_penalty(double penalty_rate,
-                                         double decrease_left,
-                                         double decrease_right,
-                                         Eigen::VectorXd target_weights_avg_left,
-                                         Eigen::VectorXd target_weights_avg_right,
-                                         std::string target_weight_penalty_metric)
-  {
-    double imbalance;
-    if (target_weight_penalty_metric == "rate_split_l2_norm")
-    {
-      // std::cout << "var" << var << "decrease:" << decrease << "penalty:" << penalty_target_weight << "\n";
-      imbalance = target_weights_avg_left.lpNorm<2>() * decrease_left + target_weights_avg_right.lpNorm<2>() * decrease_right;
-    }
-    else if (target_weight_penalty_metric == "rate_euclidean_distance")
-    {
-      double imbalance = sqrt((target_weights_avg_left - target_weights_avg_right).pow(2).sum());
-    }
-    else if (target_weight_penalty_metric == "rate_cosine_similarity")
-    {
-      double upper = (target_weights_avg_left * target_weights_avg_right).sum();
-      double lower = sqrt(target_weights_avg_left.pow(2).sum()) * sqrt(target_weights_avg_right.pow(2).sum());
-      double cosine_similarity = upper / lower; //−1 = exactly opposite, 1 = exactly the same
-      imbalance = 1 - cosine_similarity;
-    }
-    else
-    { // the R wrapper function shall have filtered out
-      imbalance = 0;
-    }
-
-    return imbalance * penalty_rate;
-  };
 
 } // namespace grf

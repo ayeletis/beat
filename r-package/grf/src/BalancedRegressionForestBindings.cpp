@@ -16,7 +16,6 @@
  #-------------------------------------------------------------------------------*/
 
 #include <map>
-#include <Rcpp.h>
 #include <sstream>
 #include <vector>
 
@@ -25,7 +24,8 @@
 #include "forest/ForestPredictors.h"
 #include "forest/ForestTrainers.h"
 #include "RcppUtilities.h"
-
+ #include "Arma/rcpparma" 
+// [[Rcpp::depends(RcppArmadillo)]]
 using namespace grf;
 
 // [[Rcpp::export]]
@@ -34,8 +34,9 @@ Rcpp::List balanced_regression_train(Rcpp::NumericMatrix train_matrix,
                                      size_t outcome_index,
                                      size_t sample_weight_index,
                                      bool use_sample_weights,
-                                     Rcpp::List target_avg_weights, // not used yet
+                                     arma::cube target_avg_weights,  
                                      double target_weight_penalty,
+                                     std::string target_weight_penalty_metric,
                                      unsigned int mtry,
                                      unsigned int num_trees,
                                      unsigned int min_node_size,
@@ -60,12 +61,10 @@ Rcpp::List balanced_regression_train(Rcpp::NumericMatrix train_matrix,
   {
     data->set_weight_index(sample_weight_index);
   }
-  
-  // Rcpp::Rcout << "Setting weights \n";
-  data->set_target_avg_weights(target_avg_weights);
-  // Rcpp::Rcout << "Setting weights done \n";
 
+  data->set_target_avg_weights(target_avg_weights);
   data->set_target_weight_penalty(target_weight_penalty);
+  data->set_target_weight_penalty_metric(target_weight_penalty_metric);
 
   ForestOptions options(num_trees, ci_group_size, sample_fraction, mtry, min_node_size, honesty,
                         honesty_fraction, honesty_prune_leaves, alpha, imbalance_penalty, num_threads, seed, clusters, samples_per_cluster);

@@ -16,7 +16,6 @@
  #-------------------------------------------------------------------------------*/
 
 #include <map>
-#include <Rcpp.h>
 #include <sstream>
 #include <vector>
 #include <iostream>
@@ -25,6 +24,9 @@
 #include "forest/ForestPredictors.h"
 #include "forest/ForestTrainers.h"
 #include "RcppUtilities.h"
+ #include "Arma/rcpparma" 
+// [[Rcpp::depends(RcppArmadillo)]]
+
 
 using namespace grf;
 
@@ -35,7 +37,7 @@ Rcpp::List balanced_causal_train(Rcpp::NumericMatrix train_matrix,
                                  size_t treatment_index,
                                  size_t sample_weight_index,
                                  bool use_sample_weights,
-                                 Rcpp::List target_avg_weights,
+                                 arma::cube target_avg_weights,
                                  double target_weight_penalty,
                                  std::string target_weight_penalty_metric,
                                  unsigned int mtry,

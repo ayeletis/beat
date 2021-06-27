@@ -15,3 +15,16 @@ r-package/grf/.vs/slnx.sqlite
 r-package/grf/.vs/VSWorkspaceState.json
 r-package/grf/.vs/grf/v15/.suo
 r-package/grf/src/.vscode/settings.json
+*.rds
+*.RData
+*.fst
+*.zip
+*.html
+*.csv
+**/trash/*
+*.Rmd
+*.txt
+*.pdf
+*.json
+.*
+!/.gitignore
