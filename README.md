@@ -138,6 +138,8 @@ Previous versions use split l2 norm rate for left and right splits. Cosine simil
 ATE V.S. Imbalance Z1
 ![benchmark metrics imbalance ate](./images/benchmark_metrics_imbalance_ate.png)
 
+## Targeting Policy
+I write some functions for balanced sampling and greedy sampling. The script is [here](https://github.com/yu45020/grf/blob/master/r-package/grf/R/select_targets.R). 
 
 ## Highlights:
 * Original package use symbolic links for all C++ codes, but Windows users may fail to build it from source. All C++ code locations are  re-arranged. 
