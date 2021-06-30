@@ -127,8 +127,19 @@ X_test_demog = cbind(X_test,Z_test)
 #            Estimate TAUs
 # ----------------------------------------------------------------
 
-
-
+a = Sys.time()
+out <- balanced_causal_forest(X_train, Y_train, W_train,
+                              target.weights = as.matrix(Z_train ) ,
+                              target.weight.penalty = 1,
+                              target.weight.standardize = TRUE,
+                              target.weight.bins.breaks = 256,
+                              #target.weight.penalty.metric = 'cosine_similarity_rate',
+                              honesty = TRUE,
+                              # num.threads = 1,
+                              num.trees = num_trees,
+                              tune.parameters=my_tunable_params,
+                              seed=my_seed)
+print(Sys.time()-a)
 # out = balanced_causal_forest(X_train, Y_train, W_train,
 #                                 target.weights = as.matrix(Z_train ) ,
 #                                 target.weight.penalty = 2,
@@ -440,7 +451,9 @@ dat_reulst_m = melt(dat_reulst, id.vars = c("penalty_rate",'data_type','policy_n
                                      "target_weight_imbalance_per_dim.Z.V1"
                     ))
 dat_reulst_m[, value := as.numeric(value) ]
-ggline(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot & data_type=='test'],
+
+ggline(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot & data_type=='train' &
+                           penalty_metric=='split_l2_norm_rate'&variable=="ipw"],
        x='penalty_rate',
        y="value",
        numeric.x.axis = TRUE,
@@ -449,9 +462,11 @@ ggline(data=dat_reulst_m[!is.na(penalty_metric) & target_rate ==target_rate_plot
        xlab="Penalty Rate",
        color="penalty_metric",
        title='Comparison of Distance Metrics Per Penalty Rate On Test Data',
-       subtitle = sprintf('Target rate: %s; points are smoothed by loess', target_rate_plot),
+       subtitle = sprintf('Target rate: %s', target_rate_plot),
        facet.by = c("variable" ),
        scales='free_y')
+
+
 ggsave("benchmark_metrics_penalty_rate_test_data.png", width=14, height=10)
 
 # 2. ipw vs penalty rate (color metric and target rate)

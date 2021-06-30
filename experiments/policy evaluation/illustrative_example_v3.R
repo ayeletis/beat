@@ -298,9 +298,9 @@ target_rate = 0.2 # target ## % of the population
 
 
 } # end of policy evaluation
-a = results[policy_name == "grf_fair"]
-b=readRDS("a.rds")
-all.equal(a,b)
+# a = results[policy_name == "grf_fair"]
+# b=readRDS("a.rds")
+# all.equal(a,b)
 
 ## -----------------------------------------------------------------------------------------
 ##   Visuals for motivation and results
@@ -536,7 +536,7 @@ estimate_taus_per_penalty = function(penalty_value){
 ## Set range for penalty
 penalty_vect =   c(seq(0.1,0.7,0.1),seq(0.8, 1.4, 0.02),seq(1.5,3,0.5))
 #penalty_vect =   c(1,5)
-
+penalty_vect = seq(0.1, 2.1, 0.3)
 ## Estimate BEAT per penalty and save TAUs
 taus_per_penalty = rbindlist(lapply(penalty_vect, estimate_taus_per_penalty))
 setwd(dir_output)

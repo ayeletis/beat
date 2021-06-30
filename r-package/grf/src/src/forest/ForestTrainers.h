@@ -29,7 +29,9 @@ ForestTrainer instrumental_trainer(double reduced_form_weight,
 
 ForestTrainer quantile_trainer(const std::vector<double>& quantiles);
 
+ForestTrainer balanced_probability_trainer(size_t num_classes);
 ForestTrainer probability_trainer(size_t num_classes);
+
 ForestTrainer balanced_regression_trainer();
 ForestTrainer regression_trainer();
 

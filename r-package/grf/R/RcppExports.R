@@ -37,6 +37,18 @@ balanced_ll_causal_predict_oob <- function(forest_object, train_matrix, sparse_t
     .Call('_grf_balanced_ll_causal_predict_oob', PACKAGE = 'grf', forest_object, train_matrix, sparse_train_matrix, outcome_index, treatment_index, ll_lambda, ll_weight_penalty, linear_correction_variables, num_threads, estimate_variance)
 }
 
+balanced_probability_train <- function(train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, target_avg_weights, target_weight_penalty, target_weight_penalty_metric, num_classes, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
+    .Call('_grf_balanced_probability_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, target_avg_weights, target_weight_penalty, target_weight_penalty_metric, num_classes, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
+}
+
+balanced_probability_predict <- function(forest_object, train_matrix, sparse_train_matrix, outcome_index, num_classes, test_matrix, sparse_test_matrix, num_threads, estimate_variance) {
+    .Call('_grf_balanced_probability_predict', PACKAGE = 'grf', forest_object, train_matrix, sparse_train_matrix, outcome_index, num_classes, test_matrix, sparse_test_matrix, num_threads, estimate_variance)
+}
+
+balanced_probability_predict_oob <- function(forest_object, train_matrix, sparse_train_matrix, outcome_index, num_classes, num_threads, estimate_variance) {
+    .Call('_grf_balanced_probability_predict_oob', PACKAGE = 'grf', forest_object, train_matrix, sparse_train_matrix, outcome_index, num_classes, num_threads, estimate_variance)
+}
+
 balanced_regression_train <- function(train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, target_avg_weights, target_weight_penalty, target_weight_penalty_metric, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed) {
     .Call('_grf_balanced_regression_train', PACKAGE = 'grf', train_matrix, sparse_train_matrix, outcome_index, sample_weight_index, use_sample_weights, target_avg_weights, target_weight_penalty, target_weight_penalty_metric, mtry, num_trees, min_node_size, sample_fraction, honesty, honesty_fraction, honesty_prune_leaves, ci_group_size, alpha, imbalance_penalty, clusters, samples_per_cluster, compute_oob_predictions, num_threads, seed)
 }
