@@ -1,4 +1,4 @@
-#' Balanced Probability forest
+#' Probability forest
 #'
 #' Trains a probability forest that can be used to estimate
 #' the conditional class probabilities P[Y = k | X = x]
@@ -77,10 +77,8 @@
 #' # Predict on out-of-bag training samples.
 #' p.hat <- predict(p.forest)
 #' }
-
 #' @import data.table
 #' @ipmort Rcpp
-#'
 #' @export
 balanced_probability_forest <- function(X, Y,
                                num.trees = 2000,
@@ -88,7 +86,7 @@ balanced_probability_forest <- function(X, Y,
                                clusters = NULL,
                                equalize.cluster.weights = FALSE,
                                sample.fraction = 0.5,
-                              target.weights = NULL,
+                                target.weights = NULL,
                               target.weight.penalty = 0,
                               target.weight.bins.breaks = 256,
                               target.weight.standardize = TRUE,
@@ -110,7 +108,6 @@ balanced_probability_forest <- function(X, Y,
     clusters <- validate_clusters(clusters, X)
     samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
     num.threads <- validate_num_threads(num.threads)
-
     # penalty
     stopifnot(target.weight.penalty >= 0)
     stopifnot(nrow(target.weights) == nrow(X))
@@ -145,8 +142,6 @@ balanced_probability_forest <- function(X, Y,
     stopifnot(is.array(target.avg.weights))
     stopifnot(dim(target.avg.weights) == c(dim(target.weights)[2], dim(X)[1], dim(X)[2]))
     # -- end of penalty
-
-
     if (length(Y) != nrow(X)) {
         stop("length of observations Y does not equal nrow(X).")
     }
@@ -166,7 +161,7 @@ balanced_probability_forest <- function(X, Y,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
                sample.fraction = sample.fraction,
-              target.avg.weights = target.avg.weights,
+                   target.avg.weights = target.avg.weights,
               target.weight.penalty = target.weight.penalty,
               target.weight.penalty.metric = target.weight.penalty.metric,
                mtry = mtry,
@@ -193,6 +188,7 @@ balanced_probability_forest <- function(X, Y,
     forest[["num.classes"]] <- num.classes
     forest[["class.names"]] <- class.names
     forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
+
 
     forest
 }

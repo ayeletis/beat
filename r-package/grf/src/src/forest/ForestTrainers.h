@@ -20,32 +20,41 @@
 
 #include "forest/ForestTrainer.h"
 
-namespace grf {
+namespace grf
+{
 
-ForestTrainer instrumental_trainer(double reduced_form_weight,
-                                   bool stabilize_splits);
+  ForestTrainer instrumental_trainer(double reduced_form_weight,
+                                     bool stabilize_splits);
 
-ForestTrainer multi_causal_trainer(size_t num_treatments,
-                                   size_t num_outcomes,
-                                   bool stabilize_splits);
+  ForestTrainer multi_causal_trainer(size_t num_treatments,
+                                     size_t num_outcomes,
+                                     bool stabilize_splits);
 
-ForestTrainer quantile_trainer(const std::vector<double>& quantiles);
+  ForestTrainer quantile_trainer(const std::vector<double> &quantiles);
 
-ForestTrainer probability_trainer(size_t num_classes);
+  ForestTrainer probability_trainer(size_t num_classes);
 
-ForestTrainer regression_trainer();
+  ForestTrainer regression_trainer();
 
-ForestTrainer multi_regression_trainer(size_t num_outcomes);
+  ForestTrainer multi_regression_trainer(size_t num_outcomes);
 
-ForestTrainer ll_regression_trainer(double split_lambda,
-                                   bool weight_penalty,
-                                   const std::vector<double>& overall_beta,
-                                   size_t ll_split_cutoff,
-                                   std::vector<size_t> ll_split_variables);
+  ForestTrainer ll_regression_trainer(double split_lambda,
+                                      bool weight_penalty,
+                                      const std::vector<double> &overall_beta,
+                                      size_t ll_split_cutoff,
+                                      std::vector<size_t> ll_split_variables);
 
-ForestTrainer survival_trainer();
+  ForestTrainer survival_trainer();
 
-ForestTrainer causal_survival_trainer(bool stabilize_splits);
+  ForestTrainer causal_survival_trainer(bool stabilize_splits);
+
+  // for balanced methods
+
+  ForestTrainer balanced_instrumental_trainer(double reduced_form_weight, bool stabilize_splits);
+  ForestTrainer balanced_probability_trainer(size_t num_classes);
+  ForestTrainer balanced_regression_trainer();
+
+  // end of balanced methods
 
 } // namespace grf
 

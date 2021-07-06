@@ -79,7 +79,6 @@ namespace grf
                                                           std::vector<bool> &send_missing_left)
   {
     size_t num_samples = samples[node].size();
-    // std::cout << "Instrument split \n";
 
     // Precompute relevant quantities for this node.
     double weight_sum_node = 0.0;
@@ -90,7 +89,7 @@ namespace grf
     {
       double sample_weight = data.get_weight(sample);
       weight_sum_node += sample_weight;
-      sum_node += sample_weight * responses_by_sample(sample);
+      sum_node += sample_weight * responses_by_sample(sample, 0);
 
       double z = data.get_instrument(sample);
       sum_node_z += sample_weight * z;
@@ -122,7 +121,6 @@ namespace grf
     std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
     double target_weight_penalty_rate = data.get_target_weight_penalty();
 
-
     arma::vec target_weight_sum(num_target_weight_cols);
     arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); // column major
 
@@ -150,8 +148,7 @@ namespace grf
   }
 
   void BalancedInstrumentalSplittingRule::find_best_split_value(const Data &data,
-                                                                size_t node,
-                                                                size_t var,
+                                                                size_t node, size_t var,
                                                                 size_t num_samples,
                                                                 double weight_sum_node,
                                                                 double sum_node,
@@ -165,8 +162,7 @@ namespace grf
                                                                 double &best_decrease,
                                                                 bool &best_send_missing_left,
                                                                 const Eigen::ArrayXXd &responses_by_sample,
-                                                                const std::vector<std::vector<size_t>> &samples,
-                                                                arma::vec &target_weight_sum,
+                                                                const std::vector<std::vector<size_t>> &samples, arma::vec &target_weight_sum,
                                                                 arma::mat &target_weight_left_sum,
                                                                 const std::string &target_weight_penalty_metric,
                                                                 const double &target_weight_penalty_rate)
@@ -214,7 +210,7 @@ namespace grf
       if (std::isnan(sample_value))
       {
         weight_sum_missing += sample_weight;
-        sum_missing += sample_weight * responses_by_sample(sample);
+        sum_missing += sample_weight * responses_by_sample(sample, 0);
         ++n_missing;
 
         sum_z_missing += sample_weight * z;
@@ -227,7 +223,7 @@ namespace grf
       else
       {
         weight_sums[split_index] += sample_weight;
-        sums[split_index] += sample_weight * responses_by_sample(sample);
+        sums[split_index] += sample_weight * responses_by_sample(sample, 0);
         ++counter[split_index];
 
         sums_z[split_index] += sample_weight * z;
@@ -251,7 +247,6 @@ namespace grf
     }
 
     target_weight_sum += data.get_target_weight_row(var, sorted_samples[num_samples - 1]); // last sample is ignored
- 
 
     size_t n_left = n_missing;
     double weight_sum_left = weight_sum_missing;
@@ -341,7 +336,7 @@ namespace grf
         double decrease = decrease_left + decrease_right;
         // Penalize splits that are too close to the edges of the data.
         decrease -= imbalance_penalty * (1.0 / size_left + 1.0 / size_right);
-
+        
         // penalize splits by target weights
         if (target_weight_penalty_rate > 0)
         {
@@ -364,7 +359,6 @@ namespace grf
         // Save this split if it is the best seen so far.
         if (decrease > best_decrease)
         {
-
           best_value = possible_split_values[i];
           best_var = var;
           best_decrease = decrease;

@@ -25,7 +25,6 @@
 #include "SplittingPenaltyMetric.h"
 #include "Arma/rcpparma"
 // [[Rcpp::depends(RcppArmadillo)]]
-
 namespace grf
 {
 
@@ -40,10 +39,10 @@ namespace grf
     this->imbalance_penalty = imbalance_penalty;
 
     this->counter = new size_t[max_num_unique_values];
-    this->counter_per_class = new size_t[num_classes * max_num_unique_values];
+    this->counter_per_class = new double[num_classes * max_num_unique_values];
   }
 
-  BalancedProbabilitySplittingRule::~BalancedProbabilitySplittingRule()
+  BalancedProbabilitySplittingRule::~BalancedProbabilitySplittingRulesssssss()
   {
     if (counter != nullptr)
     {
@@ -67,12 +66,13 @@ namespace grf
     size_t size_node = samples[node].size();
     size_t min_child_size = std::max<size_t>(std::ceil(size_node * alpha), 1uL);
 
-    size_t *class_counts = new size_t[num_classes]();
+    double *class_counts = new double[num_classes]();
     for (size_t i = 0; i < size_node; ++i)
     {
       size_t sample = samples[node][i];
-      uint sample_class = (uint)std::round(responses_by_sample(sample));
-      ++class_counts[sample_class];
+      uint sample_class = (uint)std::round(responses_by_sample(sample, 0));
+      double sample_weight = data.get_weight(sample);
+      class_counts[sample_class] += sample_weight;
     }
 
     // Initialize the variables to track the best split variable.
@@ -113,21 +113,21 @@ namespace grf
   }
 
   void BalancedProbabilitySplittingRule::find_best_split_value(const Data &data,
-                                                               size_t node, size_t var,
-                                                               size_t num_classes,
-                                                               size_t *class_counts,
-                                                               size_t size_node,
-                                                               size_t min_child_size,
-                                                               double &best_value,
-                                                               size_t &best_var,
-                                                               double &best_decrease,
-                                                               bool &best_send_missing_left,
-                                                               const Eigen::ArrayXXd &responses_by_sample,
-                                                               const std::vector<std::vector<size_t>> &samples,
-                                                               arma::vec &target_weight_sum,
-                                                               arma::mat &target_weight_left_sum,
-                                                               const std::string &target_weight_penalty_metric,
-                                                               const double &target_weight_penalty_rate)
+                                                       size_t node, size_t var,
+                                                       size_t num_classes,
+                                                       double *class_counts,
+                                                       size_t size_node,
+                                                       size_t min_child_size,
+                                                       double &best_value,
+                                                       size_t &best_var,
+                                                       double &best_decrease,
+                                                       bool &best_send_missing_left,
+                                                       const Eigen::ArrayXXd &responses_by_sample,
+                                                       const std::vector<std::vector<size_t>> &samples,
+                                                       arma::vec &target_weight_sum,
+                                                       arma::mat &target_weight_left_sum,
+                                                       const std::string &target_weight_penalty_metric,
+                                                       const double &target_weight_penalty_rate)
   {
     std::vector<double> possible_split_values;
     std::vector<size_t> sorted_samples;
@@ -139,13 +139,12 @@ namespace grf
       return;
     }
 
-    // Initialize with 0, if not in memory efficient mode, use pre-allocated space
     size_t num_splits = possible_split_values.size() - 1;
 
     std::fill(counter_per_class, counter_per_class + num_splits * num_classes, 0);
     std::fill(counter, counter + num_splits, 0);
     size_t n_missing = 0;
-    size_t *class_counts_missing = new size_t[num_classes]();
+    double *class_counts_missing = new double[num_classes]();
 
     // target weight penalty
     target_weight_sum.fill(0.0);
@@ -157,19 +156,19 @@ namespace grf
       size_t sample = sorted_samples[i];
       size_t next_sample = sorted_samples[i + 1];
       double sample_value = data.get(sample, var);
-      uint sample_class = responses_by_sample(sample);
+      uint sample_class = responses_by_sample(sample, 0);
+      double sample_weight = data.get_weight(sample);
       target_weight_sum += data.get_target_weight_row(var, sorted_samples[i]);
 
       if (std::isnan(sample_value))
       {
-        ++class_counts_missing[sample_class];
+        class_counts_missing[sample_class] += sample_weight;
         ++n_missing;
       }
       else
       {
         ++counter[split_index];
-        ++counter_per_class[split_index * num_classes + sample_class];
-
+        counter_per_class[split_index * num_classes + sample_class] += sample_weight;
         target_weight_left_sum.col(split_index) = target_weight_sum;
       }
 
@@ -185,7 +184,7 @@ namespace grf
     target_weight_sum += data.get_target_weight_row(var, sorted_samples[size_node - 1]); // last sample is ignored
 
     size_t n_left = n_missing;
-    size_t *class_counts_left = class_counts_missing;
+    double *class_counts_left = class_counts_missing;
 
     // Compute decrease of impurity for each possible split
     for (bool send_left : {true, false})
@@ -211,7 +210,7 @@ namespace grf
         // not necessary to evaluate sending right when splitting on NaN.
         if (i == 0 && !send_left)
         {
-          continue;
+!!          continue;
         }
 
         n_left += counter[i];
@@ -230,7 +229,7 @@ namespace grf
         for (size_t cls = 0; cls < num_classes; ++cls)
         {
           class_counts_left[cls] += counter_per_class[i * num_classes + cls];
-          size_t class_count_right = class_counts[cls] - class_counts_left[cls];
+          double class_count_right = class_counts[cls] - class_counts_left[cls];
 
           sum_left += class_counts_left[cls] * class_counts_left[cls];
           sum_right += class_count_right * class_count_right;
@@ -250,7 +249,7 @@ namespace grf
         // Penalize splits that are too close to the edges of the data.
         double penalty = imbalance_penalty * (1.0 / n_left + 1.0 / n_right);
         decrease -= penalty;
-
+        
         // penalize splits by target weights
         if (target_weight_penalty_rate > 0)
         {

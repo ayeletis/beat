@@ -72,9 +72,11 @@ namespace grf
     size_t *num_small_z;
     double *sums_z;
     double *sums_z_squared;
+
     uint min_node_size;
     double alpha;
     double imbalance_penalty;
+
     DISALLOW_COPY_AND_ASSIGN(BalancedInstrumentalSplittingRule);
   };
 

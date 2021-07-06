@@ -178,7 +178,7 @@ get_params_from_draw <- function(nrow.X, ncol.X, draws) {
     } else if (param == "honesty.prune.leaves") {
       return(ifelse(draws[, param] < 0.5, TRUE, FALSE))
     } else if (param=='target.weight.penalty') {
-      return(pmin(gamma(draws[,param]), 100)) # [0, 100]
+      return(pmin(gamma(draws[,param]), 10)) # [0, 100]
     }else {
       stop("Unrecognized parameter name provided: ", param)
     }

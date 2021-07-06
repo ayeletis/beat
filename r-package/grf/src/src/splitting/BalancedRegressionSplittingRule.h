@@ -18,7 +18,7 @@
 #ifndef GRF_BALANCEDREGRESSIONSPLITTINGRULE_H
 #define GRF_BALANCEDREGRESSIONSPLITTINGRULE_H
 
-#include "commons/DefaultData.h"
+#include "commons/Data.h"
 #include "splitting/SplittingRule.h"
 #include "tree/Tree.h"
 
@@ -69,7 +69,6 @@ namespace grf
 
     double alpha;
     double imbalance_penalty;
-    double *target_left_weights;
 
     DISALLOW_COPY_AND_ASSIGN(BalancedRegressionSplittingRule);
   };

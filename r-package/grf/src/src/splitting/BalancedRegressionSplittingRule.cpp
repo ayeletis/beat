@@ -16,9 +16,10 @@
  #-------------------------------------------------------------------------------*/
 
 #include <algorithm>
-#include <iostream>
 #include "BalancedRegressionSplittingRule.h"
 #include "SplittingPenaltyMetric.h"
+
+#include "RegressionSplittingRule.h"
 
 namespace grf
 {
@@ -59,7 +60,7 @@ namespace grf
                                                           std::vector<bool> &send_missing_left)
     {
         size_t num_samples = samples[node].size();
-        // std::cout << "Regression split \n";
+
         size_t size_node = samples[node].size();
         size_t min_child_size = std::max<size_t>(std::ceil(size_node * alpha), 1uL);
 
@@ -70,7 +71,7 @@ namespace grf
         {
             double sample_weight = data.get_weight(sample);
             weight_sum_node += sample_weight;
-            sum_node += sample_weight * responses_by_sample(sample);
+            sum_node += sample_weight * responses_by_sample(sample, 0);
         }
 
         // Initialize the variables to track the best split variable.
@@ -83,7 +84,7 @@ namespace grf
         size_t num_target_weight_cols = data.get_num_target_weight_cols();
         std::string target_weight_penalty_metric = data.get_target_weight_penalty_metric();
         double target_weight_penalty_rate = data.get_target_weight_penalty();
-        
+
         arma::vec target_weight_sum(num_target_weight_cols);
         arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); //column major
         //
@@ -92,8 +93,7 @@ namespace grf
         for (auto &var : possible_split_vars)
         {
             find_best_split_value(data, node, var, num_samples, weight_sum_node, sum_node, size_node, min_child_size,
-                                  best_value, best_var, best_decrease, best_send_missing_left, responses_by_sample,
-                                  samples,
+                                  best_value, best_var, best_decrease, best_send_missing_left, responses_by_sample, samples,
                                   target_weight_sum, target_weight_left_sum,
                                   target_weight_penalty_metric, target_weight_penalty_rate);
         }
@@ -130,7 +130,6 @@ namespace grf
         // sorted_samples: the node samples in increasing order (may contain duplicated Xij). Length: size_node
         std::vector<double> possible_split_values;
         std::vector<size_t> sorted_samples;
-
         data.get_all_values(possible_split_values, sorted_samples, samples[node], var);
 
         // Try next variable if all equal for this
@@ -147,20 +146,18 @@ namespace grf
         // target weight penalty
         target_weight_sum.fill(0.0);
         target_weight_left_sum.fill(0.0);
-
         size_t n_missing = 0;
         double weight_sum_missing = 0;
         double sum_missing = 0;
 
         // Fill counter and sums buckets
-        // used to store each split
         size_t split_index = 0;
         for (size_t i = 0; i < size_node - 1; i++)
         {
             size_t sample = sorted_samples[i];
             size_t next_sample = sorted_samples[i + 1];
             double sample_value = data.get(sample, var);
-            double response = responses_by_sample(sample);
+            double response = responses_by_sample(sample, 0);
             double sample_weight = data.get_weight(sample);
             target_weight_sum += data.get_target_weight_row(var, sorted_samples[i]);
 
@@ -180,7 +177,6 @@ namespace grf
             }
 
             double next_sample_value = data.get(next_sample, var);
-
             // if the next sample value is different, including the transition (..., NaN, Xij, ...)
             // then move on to the next bucket (all logical operators with NaN evaluates to false by default)
             if (sample_value != next_sample_value && !std::isnan(next_sample_value))
@@ -246,8 +242,6 @@ namespace grf
                 double decrease_right = sum_right * sum_right / weight_sum_right;
                 double decrease = decrease_left + decrease_right;
 
-                // double decrease = sum_left * sum_left / weight_sum_left + sum_right * sum_right / weight_sum_right;
-
                 // Penalize splits that are too close to the edges of the data.
                 double penalty = imbalance_penalty * (1.0 / n_left + 1.0 / n_right);
                 decrease -= penalty;
@@ -271,9 +265,10 @@ namespace grf
                     decrease -= imbalance_target_weight_penalty;
                 }
 
+                // If better than before, use this
+
                 if (decrease > best_decrease)
                 {
-
                     best_value = possible_split_values[i];
                     best_var = var;
                     best_decrease = decrease;
