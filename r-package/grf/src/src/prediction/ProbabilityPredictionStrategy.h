@@ -18,7 +18,6 @@
 #ifndef GRF_PROBABILITYPREDICTIONSTRATEGY_H
 #define GRF_PROBABILITYPREDICTIONSTRATEGY_H
 
-#include "commons/DefaultData.h"
 #include "commons/Data.h"
 #include "prediction/OptimizedPredictionStrategy.h"
 #include "prediction/PredictionValues.h"
@@ -52,6 +51,8 @@ public:
 
 private:
   size_t num_classes;
+  size_t num_types;
+  size_t weight_index;
   ObjectiveBayesDebiaser bayes_debiaser;
 };
 

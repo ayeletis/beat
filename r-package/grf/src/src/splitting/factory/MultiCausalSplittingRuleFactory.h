@@ -1,5 +1,5 @@
 /*-------------------------------------------------------------------------------
-  This file is part of generalized-random-forest.
+  This file is part of generalized random forest (grf).
 
   grf is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -15,36 +15,27 @@
   along with grf. If not, see <http://www.gnu.org/licenses/>.
  #-------------------------------------------------------------------------------*/
 
-#ifndef GRF_SPARSEDATA_H
-#define GRF_SPARSEDATA_H
+#ifndef GRF_MULTICAUSALSPLITTINGRULEFACTORY_H
+#define GRF_MULTICAUSALSPLITTINGRULEFACTORY_H
 
-
-#include "Data.h"
-#include "Eigen/Sparse"
+#include "splitting/factory/SplittingRuleFactory.h"
 
 namespace grf {
 
-class SparseData final: public Data {
+class MultiCausalSplittingRuleFactory final: public SplittingRuleFactory {
 public:
-  SparseData();
+  MultiCausalSplittingRuleFactory(size_t response_length,
+                                  size_t num_treatments);
 
-  SparseData(Eigen::SparseMatrix<double>& data,
-             size_t num_rows,
-             size_t num_cols);
-
-  ~SparseData() = default;
-
-  double get(size_t row, size_t col) const;
-
-  void reserve_memory();
-  void set(size_t col, size_t row, double value, bool& error);
-
+  std::unique_ptr<SplittingRule> create(size_t max_num_unique_values,
+                                        const TreeOptions& options) const;
 private:
-  Eigen::SparseMatrix<double> data;
+  size_t response_length;
+  size_t num_treatments;
 
-  DISALLOW_COPY_AND_ASSIGN(SparseData);
+  DISALLOW_COPY_AND_ASSIGN(MultiCausalSplittingRuleFactory);
 };
 
 } // namespace grf
 
-#endif //GRF_SPARSEDATA_H
+#endif //GRF_MULTICAUSALSPLITTINGRULEFACTORY_H

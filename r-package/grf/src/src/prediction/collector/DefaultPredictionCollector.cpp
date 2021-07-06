@@ -97,7 +97,8 @@ std::vector<Prediction> DefaultPredictionCollector::collect_predictions_batch(
     // that this can only occur when honesty is enabled, and is expected to be rare.
     if (weights_by_sample.empty()) {
       std::vector<double> nan(strategy->prediction_length(), NAN);
-      predictions.emplace_back(nan, nan, nan, nan);
+      std::vector<double> empty;
+      predictions.emplace_back(nan, estimate_variance ? nan : empty, empty, empty);
       continue;
     }
 
@@ -121,6 +122,16 @@ std::vector<Prediction> DefaultPredictionCollector::collect_predictions_batch(
     std::vector<double> variance = estimate_variance
         ? strategy->compute_variance(sample, samples_by_tree, weights_by_sample, train_data, data, forest.get_ci_group_size())
         : std::vector<double>();
+
+    // If the returned predictions are empty, then return placeholder predictions.
+    // This can occur if for example all case sample weights are zero,
+    // and the prediction strategy opts to predict nothing.
+    if (point_prediction.empty()) {
+      std::vector<double> nan(strategy->prediction_length(), NAN);
+      std::vector<double> empty;
+      predictions.emplace_back(nan, estimate_variance ? nan : empty, empty, empty);
+      continue;
+    }
 
     Prediction prediction(point_prediction, variance, {}, {});
     validate_prediction(sample, point_prediction);

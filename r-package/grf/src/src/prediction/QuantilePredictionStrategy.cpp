@@ -17,9 +17,8 @@
 
 #include <algorithm>
 #include <vector>
-#include <string>
 
-#include "commons/DefaultData.h"
+#include "commons/Data.h"
 #include "prediction/QuantilePredictionStrategy.h"
 
 namespace grf {

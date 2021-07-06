@@ -16,9 +16,7 @@
  #-------------------------------------------------------------------------------*/
 
 #include <cmath>
-#include <string>
 #include <vector>
-#include <iostream>
 #include "commons/utility.h"
 #include "commons/Data.h"
 #include "prediction/LLCausalPredictionStrategy.h"
@@ -216,14 +214,14 @@ std::vector<double> LLCausalPredictionStrategy::compute_variance(
 
     // standard ridge penalty
     for(size_t j = 1; j < dim_X; ++j){
-      if(j != treatment_index){
+      if (j != treatment_index){
         M(j, j) += lambda * normalization;
       }
     }
   } else {
     // covariance ridge penalty
     for(size_t j = 1; j < dim_X; ++j){
-      if(j != treatment_index){
+      if (j != treatment_index){
         M(j, j) += lambda * M(j, j);
       }
     }

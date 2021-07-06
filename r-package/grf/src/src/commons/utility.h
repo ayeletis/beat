@@ -18,9 +18,6 @@
 #ifndef GRF_UTILITY_H_
 #define GRF_UTILITY_H_
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -40,9 +37,13 @@ void split_sequence(std::vector<uint>& result, uint start, uint end, uint num_pa
 
 bool equal_doubles(double first, double second, double epsilon);
 
-std::unique_ptr<Data> load_data(const std::string& file_name);
+/**
+ * Load a whitespace delimited file into a std::vector<double>.
+ * The number of rows and columns are the second item in the returned pair.
+ */
+std::pair<std::vector<double>, std::vector<size_t>> load_data(const std::string& file_name);
 
-std::unique_ptr<Data> load_sparse_data(const std::string& file_name);
+void set_data(std::pair<std::vector<double>, std::vector<size_t>>& data, size_t row, size_t col, double value);
 
 } // namespace grf
 

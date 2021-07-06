@@ -28,13 +28,16 @@ bool CausalSurvivalRelabelingStrategy::relabel(
   // Prepare the relevant averages.
   double numerator_sum = 0;
   double denominator_sum = 0;
+  double sum_weight = 0.0;
 
   for (size_t sample : samples) {
-    numerator_sum += data.get_causal_survival_numerator(sample);
-    denominator_sum += data.get_causal_survival_denominator(sample);
+    double sample_weight = data.get_weight(sample);
+    numerator_sum += sample_weight * data.get_causal_survival_numerator(sample);
+    denominator_sum += sample_weight * data.get_causal_survival_denominator(sample);
+    sum_weight += sample_weight;
   }
 
-  if (equal_doubles(denominator_sum, 0.0, 1.0e-10)) {
+  if (equal_doubles(denominator_sum, 0.0, 1.0e-10) || std::abs(sum_weight) <= 1e-16) {
     return true;
   }
 
@@ -44,7 +47,7 @@ bool CausalSurvivalRelabelingStrategy::relabel(
   for (size_t sample : samples) {
     double response = (data.get_causal_survival_numerator(sample) -
       data.get_causal_survival_denominator(sample) * eta) / denominator_sum;
-    responses_by_sample(sample) = response;
+    responses_by_sample(sample, 0) = response;
   }
   return false;
 }

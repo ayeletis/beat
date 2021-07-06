@@ -19,16 +19,16 @@
 #define GRF_CAUSALSURVIVALSPLITTINGRULE_H
 
 #include "commons/Data.h"
-#include "commons/Data.h"
 #include "splitting/SplittingRule.h"
-
-/**
- * This splitting rule is identical to `InstrumentalSplittingRule` with the
- * addition of requiring at least `min_node_size` failures in each child node.
-*/
 
 namespace grf {
 
+/**
+ * This splitting rule is identical to {@link InstrumentalSplittingRule} with the
+ * following additional size requirement:
+ * number_of_failures(child) >= number_of_samples(parent) * alpha.
+ * (This is the same size requirement used in {@link SurvivalSplittingRule}).
+ */
 class CausalSurvivalSplittingRule final: public SplittingRule {
 public:
   CausalSurvivalSplittingRule(size_t max_num_unique_values,

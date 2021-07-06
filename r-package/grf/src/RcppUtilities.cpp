@@ -1,10 +1,24 @@
-#include <Rcpp.h>
-#include <sstream>
+/*-------------------------------------------------------------------------------
+  This file is part of generalized random forest (grf).
 
-#include "commons/DefaultData.h"
-#include "commons/SparseData.h"
+  grf is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  grf is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with grf. If not, see <http://www.gnu.org/licenses/>.
+ #-------------------------------------------------------------------------------*/
+
+#include <Rcpp.h>
+
+#include "commons/Data.h"
 #include "forest/ForestOptions.h"
-#include "RcppData.h"
 #include "RcppUtilities.h"
 
 using namespace grf;
@@ -72,6 +86,7 @@ Rcpp::List RcppUtilities::serialize_forest(Forest& forest) {
   size_t num_types = 0;
 
   for (size_t t = 0; t < num_trees; t++) {
+    // Destructively iterate over the forest by moving the unique_ptr to each tree.
     std::unique_ptr<Tree> tree = std::move(forest.get_trees_().at(t));
     root_nodes[t] = tree->get_root_node();
     child_nodes[t] = tree->get_child_nodes();
@@ -97,20 +112,8 @@ Rcpp::List RcppUtilities::serialize_forest(Forest& forest) {
   return result;
 };
 
-std::unique_ptr<Data> RcppUtilities::convert_data(Rcpp::NumericMatrix& input_data,
-                                                  Eigen::SparseMatrix<double>& sparse_input_data) {
-  std::unique_ptr<Data> data;
-  if (input_data.nrow() > 0) {
-    size_t num_rows = input_data.nrow();
-    size_t num_cols = input_data.ncol();
-    data = std::unique_ptr<Data>(new RcppData(input_data, num_rows, num_cols));
-  } else {
-    size_t num_rows = sparse_input_data.rows();
-    size_t num_cols = sparse_input_data.cols();
-
-    data = std::unique_ptr<Data>(new SparseData(sparse_input_data, num_rows, num_cols));
-  }
-  return data;
+Data RcppUtilities::convert_data(const Rcpp::NumericMatrix& input_data) {
+  return Data(input_data.begin(), input_data.nrow(), input_data.ncol());
 }
 
 Rcpp::List RcppUtilities::create_prediction_object(const std::vector<Prediction>& predictions) {
@@ -178,8 +181,7 @@ Rcpp::NumericMatrix RcppUtilities::create_error_matrix(const std::vector<Predict
     return Rcpp::NumericMatrix(0);
   }
 
-  size_t prediction_length = first_prediction.size();
-  Rcpp::NumericMatrix result(predictions.size(), prediction_length);
+  Rcpp::NumericMatrix result(predictions.size(), 1);
 
   for (size_t i = 0; i < predictions.size(); i++) {
     const std::vector<double>& error_estimate = predictions[i].get_error_estimates();
@@ -202,8 +204,7 @@ Rcpp::NumericMatrix RcppUtilities::create_excess_error_matrix(const std::vector<
     return Rcpp::NumericMatrix(0);
   }
 
-  size_t prediction_length = first_prediction.size();
-  Rcpp::NumericMatrix result(predictions.size(), prediction_length);
+  Rcpp::NumericMatrix result(predictions.size(), 1);
 
   for (size_t i = 0; i < predictions.size(); i++) {
     const std::vector<double>& error_estimate = predictions[i].get_excess_error_estimates();

@@ -18,10 +18,8 @@
 #ifndef GRF_PREDICTIONVALUES_H
 #define GRF_PREDICTIONVALUES_H
 
-
+#include <cstddef>
 #include <vector>
-#include <string>
-#include <map>
 
 namespace grf {
 
@@ -45,11 +43,6 @@ public:
   const size_t get_num_nodes() const;
   const size_t get_num_types() const;
 
-  /**
-   * Empties out all data in this object. Used to reduce memory
-   * usage when destructively iterating through a {@link Forest} object.
-   */
-  void clear();
 private:
   std::vector<std::vector<double>> values;
   size_t num_nodes;

@@ -18,7 +18,6 @@
 #ifndef GRF_MULTIREGRESSIONPREDICTIONSTRATEGY_H
 #define GRF_MULTIREGRESSIONPREDICTIONSTRATEGY_H
 
-#include "commons/DefaultData.h"
 #include "commons/Data.h"
 #include "prediction/OptimizedPredictionStrategy.h"
 #include "prediction/PredictionValues.h"
@@ -52,6 +51,8 @@ public:
 
 private:
   size_t num_outcomes;
+  size_t num_types;
+  size_t weight_index;
 };
 
 } // namespace grf

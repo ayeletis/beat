@@ -19,16 +19,22 @@
 
  namespace grf {
 
+ MultiNoopRelabelingStrategy::MultiNoopRelabelingStrategy(size_t num_outcomes) :
+  num_outcomes(num_outcomes) {}
+
  bool MultiNoopRelabelingStrategy::relabel(
      const std::vector<size_t>& samples,
      const Data& data,
      Eigen::ArrayXXd& responses_by_sample) const {
 
    for (size_t sample : samples) {
-     Eigen::VectorXd outcome = data.get_outcomes(sample);
-     responses_by_sample.row(sample) = outcome;
+     responses_by_sample.row(sample) = data.get_outcomes(sample);
    }
    return false;
  }
+
+size_t MultiNoopRelabelingStrategy::get_response_length() const {
+  return num_outcomes;
+}
 
  } // namespace grf

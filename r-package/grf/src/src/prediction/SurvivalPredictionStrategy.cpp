@@ -45,17 +45,23 @@ std::vector<double> SurvivalPredictionStrategy::predict(size_t prediction_sample
   std::vector<double> count_failure(num_failures + 1);
   std::vector<double> count_censor(num_failures + 1);
   double sum = 0;
+  double sum_weight = 0;
   for (const auto& entry : weights_by_sample) {
     size_t sample = entry.first;
     double forest_weight = entry.second;
     size_t failure_time = train_data.get_outcome(sample);
     double sample_weight = train_data.get_weight(sample);
-    if (train_data.is_censored(sample)) {
+    if (train_data.is_failure(sample)) {
      count_failure[failure_time] += forest_weight * sample_weight;
     } else {
      count_censor[failure_time] += forest_weight * sample_weight;
     }
     sum += forest_weight * sample_weight;
+    sum_weight += sample_weight;
+  }
+
+  if (std::abs(sum_weight) <= 1e-16) {
+    return std::vector<double>();
   }
 
   if (prediction_type == NELSON_AALEN) {

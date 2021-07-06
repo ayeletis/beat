@@ -16,9 +16,9 @@
  #-------------------------------------------------------------------------------*/
 
 #include <Rcpp.h>
-#include <queue>
 #include <vector>
 
+#include "Eigen/Sparse"
 #include "analysis/SplitFrequencyComputer.h"
 #include "commons/globals.h"
 #include "forest/Forest.h"
@@ -30,7 +30,7 @@
 using namespace grf;
 
 // [[Rcpp::export]]
-Rcpp::NumericMatrix compute_split_frequencies(Rcpp::List forest_object,
+Rcpp::NumericMatrix compute_split_frequencies(const Rcpp::List& forest_object,
                                               size_t max_depth) {
   Forest forest = RcppUtilities::deserialize_forest(forest_object);
 
@@ -49,26 +49,24 @@ Rcpp::NumericMatrix compute_split_frequencies(Rcpp::List forest_object,
   return result;
 }
 
-Eigen::SparseMatrix<double> compute_sample_weights(Rcpp::List forest_object,
-                                                   Rcpp::NumericMatrix train_matrix,
-                                                   Eigen::SparseMatrix<double> sparse_train_matrix,
-                                                   Rcpp::NumericMatrix test_matrix,
-                                                   Eigen::SparseMatrix<double> sparse_test_matrix,
+Eigen::SparseMatrix<double> compute_sample_weights(const Rcpp::List& forest_object,
+                                                   const Rcpp::NumericMatrix& train_matrix,
+                                                   const Rcpp::NumericMatrix& test_matrix,
                                                    unsigned int num_threads,
                                                    bool oob_prediction) {
-  std::unique_ptr<Data> train_data = RcppUtilities::convert_data(train_matrix, sparse_train_matrix);
-  std::unique_ptr<Data> data = RcppUtilities::convert_data(test_matrix, sparse_test_matrix);
+  Data train_data = RcppUtilities::convert_data(train_matrix);
+  Data data = RcppUtilities::convert_data(test_matrix);
   Forest forest = RcppUtilities::deserialize_forest(forest_object);
   num_threads = ForestOptions::validate_num_threads(num_threads);
 
   TreeTraverser tree_traverser(num_threads);
   SampleWeightComputer weight_computer;
 
-  std::vector<std::vector<size_t>> leaf_nodes_by_tree = tree_traverser.get_leaf_nodes(forest, *data, oob_prediction);
-  std::vector<std::vector<bool>> trees_by_sample = tree_traverser.get_valid_trees_by_sample(forest, *data, oob_prediction);
+  std::vector<std::vector<size_t>> leaf_nodes_by_tree = tree_traverser.get_leaf_nodes(forest, data, oob_prediction);
+  std::vector<std::vector<bool>> trees_by_sample = tree_traverser.get_valid_trees_by_sample(forest, data, oob_prediction);
 
-  size_t num_samples = data->get_num_rows();
-  size_t num_neighbors = train_data->get_num_rows();
+  size_t num_samples = data.get_num_rows();
+  size_t num_neighbors = train_data.get_num_rows();
 
   // From http://eigen.tuxfamily.org/dox/group__TutorialSparse.html:
   // Filling a sparse matrix effectively
@@ -91,27 +89,24 @@ Eigen::SparseMatrix<double> compute_sample_weights(Rcpp::List forest_object,
 }
 
 // [[Rcpp::export]]
-Eigen::SparseMatrix<double> compute_weights(Rcpp::List forest_object,
-                                            Rcpp::NumericMatrix train_matrix,
-                                            Eigen::SparseMatrix<double> sparse_train_matrix,
-                                            Rcpp::NumericMatrix test_matrix,
-                                            Eigen::SparseMatrix<double> sparse_test_matrix,
+Eigen::SparseMatrix<double> compute_weights(const Rcpp::List& forest_object,
+                                            const Rcpp::NumericMatrix& train_matrix,
+                                            const Rcpp::NumericMatrix& test_matrix,
                                             unsigned int num_threads) {
-  return compute_sample_weights(forest_object, train_matrix, sparse_test_matrix,
-                                test_matrix, sparse_test_matrix, num_threads, false);
+  return compute_sample_weights(forest_object, train_matrix,
+                                test_matrix, num_threads, false);
 }
 
 // [[Rcpp::export]]
-Eigen::SparseMatrix<double> compute_weights_oob(Rcpp::List forest_object,
-                                                Rcpp::NumericMatrix test_matrix,
-                                                Eigen::SparseMatrix<double> sparse_test_matrix,
+Eigen::SparseMatrix<double> compute_weights_oob(const Rcpp::List& forest_object,
+                                                const Rcpp::NumericMatrix& train_matrix,
                                                 unsigned int num_threads) {
-  return compute_sample_weights(forest_object, test_matrix, sparse_test_matrix,
-                                test_matrix, sparse_test_matrix, num_threads, true);
+  return compute_sample_weights(forest_object, train_matrix,
+                                train_matrix, num_threads, true);
 }
 
 // [[Rcpp::export]]
-Rcpp::List merge(const Rcpp::List forest_objects) {
+Rcpp::List merge(const Rcpp::List& forest_objects) {
  std::vector<Forest> forests;
 
  for (auto& forest_obj : forest_objects) {

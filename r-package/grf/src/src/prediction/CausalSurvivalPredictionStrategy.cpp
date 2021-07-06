@@ -113,9 +113,6 @@ PredictionValues CausalSurvivalPredictionStrategy::precompute_prediction_values(
       continue;
     }
 
-    std::vector<double>& value = values[i];
-    value.resize(NUM_TYPES);
-
     double numerator_sum = 0;
     double denominator_sum = 0;
     double sum_weight = 0;
@@ -131,18 +128,11 @@ PredictionValues CausalSurvivalPredictionStrategy::precompute_prediction_values(
     if (std::abs(sum_weight) <= 1e-16) {
       continue;
     }
+    std::vector<double>& value = values[i];
+    value.resize(NUM_TYPES);
 
-    // if the denominator sum is zero, treat the leaf as empty
-    // this can only occur when there are zero failures in the leaf,
-    // which can happen with RegressionSplitting (does not take censoring
-    // status into account when splitting), or with CausalSurvivalSplitting
-    // but honesty on.
-    if (equal_doubles(denominator_sum, 0.0, 1.0e-10)) {
-      continue;
-    }
-
-    value[NUMERATOR] = numerator_sum / sum_weight;
-    value[DENOMINATOR] = denominator_sum / sum_weight;
+    value[NUMERATOR] = numerator_sum / leaf_size;
+    value[DENOMINATOR] = denominator_sum / leaf_size;
   }
 
   return PredictionValues(values, NUM_TYPES);
