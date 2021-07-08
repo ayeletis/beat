@@ -53,7 +53,7 @@ print.grf_tree <- function(x, ...) {
 
     if (node$is_leaf) {
       leaf_stats_text <- ""
-      if(!is.null(node$leaf_stats)){
+      if (!is.null(node$leaf_stats)) {
         leaf_stats_text <- paste(paste(names(node$leaf_stats), unname(node$leaf_stats), sep = ": ", collapse = " "))
       }
       output <- paste(output, "* num_samples:", length(node$samples), "", leaf_stats_text)
@@ -95,7 +95,6 @@ print.boosted_regression_forest <- function(x, ...) {
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @method print tuning_output
-#' @importFrom stats aggregate quantile
 #' @export
 print.tuning_output <- function(x, tuning.quantiles = seq(0, 1, 0.2), ...) {
   if (x$status == "failure") {
@@ -109,17 +108,12 @@ print.tuning_output <- function(x, tuning.quantiles = seq(0, 1, 0.2), ...) {
     cat("However, we could not find parameters that were expected to perform better than default: \n\n")
     params <- x$params
     cat(paste0(names(params), ": ", params, "\n"))
-  } else if (x$status=='user_input'){
-    cat("Tuning status: user input. \n")
-    cat("This indicates user input parameters are better than tuning and default parameters. ")
-    params <-x$params
-    cat(paste0(names(params), ": ", params, "\n"))
   } else if (x$status == "tuned") {
     cat("Tuning status: tuned.\n")
     cat("This indicates tuning found parameters that are expected to perform better than default. \n\n")
     grid <- x$grid
     out <- lapply(colnames(grid)[-1], function(name) {
-      q <- quantile(grid[, name], probs = tuning.quantiles)
+      q <- stats::quantile(grid[, name], probs = tuning.quantiles)
       # Cannot form for example quintiles for mtry if the number of variables is
       # less than 5, so here we just truncate the groups.
       if (length(unique(q) < length(q))) {
@@ -131,7 +125,7 @@ print.tuning_output <- function(x, tuning.quantiles = seq(0, 1, 0.2), ...) {
       if (length(levels(rank)) == 1) {
         rank = grid[, name]
       }
-      out <- aggregate(grid[, "error"], by = list(rank), FUN = mean)
+      out <- stats::aggregate(grid[, "error"], by = list(rank), FUN = mean)
       colnames(out) <- c(name, "error")
       out
     })

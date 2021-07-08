@@ -50,8 +50,6 @@
 #' data <- generate_causal_data(100, 5, dgp = "aw1")
 #' data2 <- generate_causal_data(100, 5, dgp = "aw2")
 #' }
-#' @importFrom stats toeplitz
-#' @importFrom utils installed.packages
 #' @export
 generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise = 1,
                                  dgp = c("simple", "aw1", "aw2", "aw3", "aw3reverse",
@@ -67,7 +65,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
   }
 
   if (dgp == "kunzel") {
-    if (!("MASS" %in% installed.packages())) {
+    if (!("MASS" %in% utils::installed.packages())) {
       msg <- paste0("Selected dgp ", dgp, " requires the MASS library.")
       stop(msg)
     }
@@ -139,14 +137,14 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
   } else if (dgp == "kunzel") {
     # "Simulation 1" from A.1 in https://arxiv.org/pdf/1706.03461.pdf
     # Extremely unbalanced treatment assignment, easy treatment effect.
-    X <- MASS::mvrnorm(n = n, mu = rep(0, p), Sigma = toeplitz(0.5^seq(0, p - 1)))
+    X <- MASS::mvrnorm(n = n, mu = rep(0, p), Sigma = stats::toeplitz(0.5^seq(0, p - 1)))
     tau <- 8 * (X[, 2] > 0.1)
     beta <- runif(p, -5, 5)
     mu_0 <- X %*% beta + 5 * (X[, 1] > 0.5) + rnorm(n = n)
     mu_1 <- mu_0 + tau + rnorm(n = n)
     e <- rep(0.01, n)
     W <- rbinom(n = n, size = 1, prob = e)
-    m <- W * mu_1 + (1 - W) * mu_0 - (W - e) * tau
+    m <- c(W * mu_1 + (1 - W) * mu_0 - (W - e) * tau)
     V <- 1
   } else if (dgp == "nw1") {
     # "Setup A" from Section 4 of https://arxiv.org/pdf/1712.04912.pdf
@@ -156,7 +154,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
     eta <- 0.1
     e <- pmax(eta, pmin(sin(pi * X[, 1] * X[, 2]), 1 - eta))
     W <- rbinom(n = n, size = 1, prob = e)
-    m <- sin(pi * X[, 1] * X[, 2]) + 2 * (X[, 3] - 0.5)^2 + X[, 4] + 0.5 * X[, 5]
+    m <- sin(pi * X[, 1] * X[, 2]) + 2 * (X[, 3] - 0.5)^2 + X[, 4] + 0.5 * X[, 5] + e * tau
     V <- 1
   } else if (dgp == "nw2") {
     # "Setup B" from Section 4 of https://arxiv.org/pdf/1712.04912.pdf
@@ -165,7 +163,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
     tau <- X[,1] + log(1 + exp(X[, 2]))
     e <- rep(0.5, n)
     W <- rbinom(n = n, size = 1, prob = e)
-    m <- pmax(0, X[, 1] + X[, 2], X[, 3]) + pmax(0, X[, 4] + X[, 5])
+    m <- pmax(0, X[, 1] + X[, 2], X[, 3]) + pmax(0, X[, 4] + X[, 5]) + e * tau
     V <- 1
   } else if (dgp == "nw3") {
     # "Setup C" from Section 4 of https://arxiv.org/pdf/1712.04912.pdf
@@ -175,7 +173,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
     tau <- rep(1, n)
     e <- 1 / (1 + exp(X[, 2] + X[, 3]))
     W <- rbinom(n = n, size = 1, prob = e)
-    m <- 2 * log(1 + exp(X[, 1] + X[, 2] + X[, 3]))
+    m <- 2 * log(1 + exp(X[, 1] + X[, 2] + X[, 3])) + e * tau
     V <- 1
   } else if (dgp == "nw4") {
     # "Setup D" from Section 4 of https://arxiv.org/pdf/1712.04912.pdf
@@ -185,7 +183,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
     tau <- pmax(X[, 1] + X[, 2] + X[, 3], 0) - pmax(X[, 4] + X[, 5], 0)
     e <- 1 / (1 + exp(-X[, 1]) + exp(-X[, 2]))
     W <- rbinom(n = n, size = 1, prob = e)
-    m <- (pmax(X[, 1] + X[, 2] + X[, 3], 0) + pmax(X[, 4] + X[, 5], 0)) / 2
+    m <- (pmax(X[, 1] + X[, 2] + X[, 3], 0) + pmax(X[, 4] + X[, 5], 0)) / 2 + e * tau
     V <- 1
   }
 
@@ -203,7 +201,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
   out
 }
 
-#' Simulate survival data
+#' Simulate causal survival data
 #'
 #' The following DGPs are available for benchmarking purposes, T is the failure time
 #' and C the censoring time:
@@ -232,16 +230,15 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
 #' # Generate data
 #' n <- 1000
 #' p <- 5
-#' data <- generate_survival_data(n, p)
+#' data <- generate_causal_survival_data(n, p)
 #' # Get true CATE on a test set
 #' X.test <- matrix(seq(0, 1, length.out = 5), 5, p)
-#' cate.test <- generate_survival_data(n, p, X = X.test)$cate
+#' cate.test <- generate_causal_survival_data(n, p, X = X.test)$cate
 #' }
 #'
-#' @importFrom stats dbeta rbinom rexp rnorm rpois
 #' @export
-generate_survival_data <- function(n, p, Y.max = NULL, X = NULL, n.mc = 10000,
-                                   dgp = c("simple1", "type1", "type2", "type3", "type4", "type5")) {
+generate_causal_survival_data <- function(n, p, Y.max = NULL, X = NULL, n.mc = 10000,
+                                          dgp = c("simple1", "type1", "type2", "type3", "type4", "type5")) {
   .minp <- c(simple1 = 1, type1 = 5, type2 = 5, type3 = 5, type4 = 5, type5 = 5)
   dgp <- match.arg(dgp)
   minp <- .minp[dgp]
@@ -282,9 +279,8 @@ generate_survival_data <- function(n, p, Y.max = NULL, X = NULL, n.mc = 10000,
     e <- (1 + dbeta(X[, 1], 2, 4)) / 4
     W <- rbinom(n, 1, e)
     I1 <- X[,1 ] < 0.5
-    eps <- rnorm(n)
     ft <- exp(-1.85 - 0.8 * I1 + 0.7 * sqrt(X[, 2]) + 0.2 * X[, 3] +
-                (0.7 - 0.4 * I1 - 0.4 * sqrt(X[, 2])) * W + eps)
+                (0.7 - 0.4 * I1 - 0.4 * sqrt(X[, 2])) * W + rnorm(n))
     failure.time <- pmin(ft, Y.max)
     numerator <- -log(runif(n))
     denominator <- exp(-1.75 - 0.5 * sqrt(X[, 2]) + 0.2 * X[, 3]  + (1.15 + 0.5 * I1 - 0.3 * sqrt(X[, 2])) * W)

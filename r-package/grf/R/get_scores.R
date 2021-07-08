@@ -40,97 +40,11 @@ get_scores <- function(forest, ...) {
 #'             multivariate regression models with missing data." Journal of the
 #'             American Statistical Association 90(429), 1995.
 #'
+#' @return A vector of scores.
+#'
 #' @method get_scores causal_forest
 #' @export
 get_scores.causal_forest <- function(forest,
-                                     subset = NULL,
-                                     debiasing.weights = NULL,
-                                     num.trees.for.weights = 500,
-                                     ...) {
-  subset <- validate_subset(forest, subset)
-  W.orig <- forest$W.orig[subset]
-  W.hat <- forest$W.hat[subset]
-  Y.orig <- forest$Y.orig[subset]
-  Y.hat <- forest$Y.hat[subset]
-  tau.hat.pointwise <- predict(forest)$predictions[subset]
-
-  binary.W <- all(forest$W.orig %in% c(0, 1))
-
-  if (is.null(debiasing.weights)) {
-    if (binary.W) {
-      debiasing.weights <- (W.orig - W.hat) / (W.hat * (1 - W.hat))
-    } else {
-      # Start by learning debiasing weights if needed.
-      # The goal is to estimate the variance of W given X. For binary treatments,
-      # we get a good implicit estimator V.hat = e.hat (1 - e.hat), and
-      # so this step is not needed. Note that if we use the present CAPE estimator
-      # with a binary treatment and set V.hat = e.hat (1 - e.hat), then we recover
-      # exactly the AIPW estimator of the CATE.
-      clusters <- if (length(forest$clusters) > 0) {
-        forest$clusters
-      } else {
-        1:length(forest$Y.orig)
-      }
-      variance_forest <- regression_forest(forest$X.orig,
-                                           (forest$W.orig - forest$W.hat)^2,
-                                           clusters = clusters,
-                                           sample.weights = forest$sample.weights,
-                                           num.trees = num.trees.for.weights,
-                                           ci.group.size = 1)
-      V.hat <- predict(variance_forest)$predictions
-      debiasing.weights.all <- (forest$W.orig - forest$W.hat) / V.hat
-      debiasing.weights <- debiasing.weights.all[subset]
-    }
-  } else if (length(debiasing.weights) == length(forest$Y.orig)) {
-    debiasing.weights <- debiasing.weights[subset]
-  } else if (length(debiasing.weights) != length(subset))  {
-    stop("If specified, debiasing.weights must have length n or |subset|.")
-  }
-
-  # Form AIPW scores. Note: We are implicitly using the following
-  # estimates for the regression surfaces E[Y|X, W=0/1]:
-  # Y.hat.0 <- Y.hat - W.hat * tau.hat.pointwise
-  # Y.hat.1 <- Y.hat + (1 - W.hat) * tau.hat.pointwise
-  Y.residual <- Y.orig - (Y.hat + tau.hat.pointwise * (W.orig - W.hat))
-
-  tau.hat.pointwise + debiasing.weights * Y.residual
-}
-
-#' Compute doubly robust scores for a causal forest.
-#'
-#' Compute doubly robust (AIPW) scores for average treatment effect estimation
-#' or average partial effect estimation with continuous treatment,
-#' using a causal forest. Under regularity conditions, the average of the DR.scores
-#' is an efficient estimate of the average treatment effect.
-#'
-#' @param forest A trained causal forest.
-#' @param subset Specifies subset of the training examples over which we
-#'               estimate the ATE. WARNING: For valid statistical performance,
-#'               the subset should be defined only using features Xi, not using
-#'               the treatment Wi or the outcome Yi.
-#' @param debiasing.weights A vector of length n (or the subset length) of debiasing weights.
-#'               If NULL (default) they are obtained via inverse-propensity weighting in the case
-#'               of binary treatment or by estimating Var[W | X = x] using a new forest
-#'               in the case of a continuous treatment.
-#' @param num.trees.for.weights Number of trees used to estimate Var[W | X = x]. Note: this
-#'               argument is only used when debiasing.weights = NULL.
-#' @param ... Additional arguments (currently ignored).
-#'
-#' @references Farrell, Max H. "Robust inference on average treatment effects with
-#'             possibly more covariates than observations." Journal of Econometrics
-#'             189(1), 2015.
-#' @references Graham, Bryan S., and Cristine Campos de Xavier Pinto. "Semiparametrically
-#'             efficient estimation of the average linear regression function." arXiv preprint
-#'             arXiv:1810.12511, 2018.
-#' @references Hirshberg, David A., and Stefan Wager. "Augmented minimax linear estimation."
-#'             arXiv preprint arXiv:1712.00038, 2017.
-#' @references Robins, James M., and Andrea Rotnitzky. "Semiparametric efficiency in
-#'             multivariate regression models with missing data." Journal of the
-#'             American Statistical Association 90(429), 1995.
-#'
-#' @method get_scores balanced_causal_forest
-#' @export
-get_scores.balanced_causal_forest <- function(forest,
                                      subset = NULL,
                                      debiasing.weights = NULL,
                                      num.trees.for.weights = 500,
@@ -222,6 +136,8 @@ get_scores.balanced_causal_forest <- function(forest,
 #' @references Imbens, Guido W., and Joshua D. Angrist. "Identification and Estimation of
 #'             Local Average Treatment Effects." Econometrica 62(2), 1994.
 #'
+#' @return A vector of scores.
+#'
 #' @method get_scores instrumental_forest
 #' @export
 get_scores.instrumental_forest <- function(forest,
@@ -297,7 +213,72 @@ get_scores.instrumental_forest <- function(forest,
   tau.hat.pointwise + debiasing.weights * Y.residual
 }
 
-#' Compute doubly robust for a causal survival forest.
+#' Compute doubly robust scores for a multi arm causal forest.
+#'
+#' Compute doubly robust (AIPW) scores for average treatment effect estimation
+#' using a multi arm causal forest. Under regularity conditions, the average of the DR.scores
+#' is an efficient estimate of the average treatment effect.
+#'
+#' @param forest A trained multi arm causal forest.
+#' @param subset Specifies subset of the training examples over which we
+#'               estimate the ATE. WARNING: For valid statistical performance,
+#'               the subset should be defined only using features Xi, not using
+#'               the treatment Wi or the outcome Yi.
+#' @param ... Additional arguments (currently ignored).
+#'
+#' @return An array of scores for each contrast and outcome.
+#'
+#' @method get_scores multi_arm_causal_forest
+#' @export
+get_scores.multi_arm_causal_forest <- function(forest,
+                                               subset = NULL,
+                                               ...) {
+  subset <- validate_subset(forest, subset)
+  W.orig <- forest$W.orig[subset]
+  W.hat <- forest$W.hat[subset, , drop = FALSE]
+  treatment.names <- levels(W.orig)
+  observed.treatment <- match(W.orig, treatment.names)
+  observed.treatment.idx <- cbind(seq_along(subset), observed.treatment)
+  contrast.names <- paste(treatment.names[-1], "-", treatment.names[1])
+
+  if (min(W.hat) <= 0.05 || max(W.hat) >= 0.95) {
+    min <- apply(W.hat, 2, min)
+    max <- apply(W.hat, 2, max)
+    warning(paste0(
+      "Estimated treatment propensities take values very close to 0 or 1",
+      " meaning some estimates may not be well identified.",
+      " In particular, the minimum propensity estimates for each arm is\n",
+      paste0(treatment.names, ": ", round(min, 3), collapse = " "),
+      "\nand the maximum is\n",
+      paste0(treatment.names, ": ", round(max, 3), collapse = " "),
+      "."
+    ))
+  }
+  W.hat <- W.hat[, -1, drop = FALSE]
+  W.matrix <- stats::model.matrix(~ W.orig - 1)
+  IPW <- (W.matrix[, -1] - W.hat) / (W.hat * (1 - W.hat))
+  forest.pp <- predict(forest)
+
+  .get.scores <- function(outcome) {
+    Y.orig <- forest$Y.orig[subset, outcome]
+    Y.hat <- forest$Y.hat[subset, outcome]
+    tau.hat.pointwise <- forest.pp$predictions[subset, , outcome]
+
+    Y.hat.baseline <- Y.hat - rowSums(W.hat * tau.hat.pointwise)
+    mu.hat.matrix <- cbind(Y.hat.baseline, Y.hat.baseline + tau.hat.pointwise)
+    Y.residual <- Y.orig - mu.hat.matrix[observed.treatment.idx]
+
+    tau.hat.pointwise + IPW * Y.residual
+  }
+
+  scores <- lapply(1:NCOL(forest$Y.orig), function(col) .get.scores(col))
+
+  array(unlist(scores), dim = c(length(subset), dim(forest.pp$predictions)[-1]), dimnames = dimnames(forest.pp$predictions))
+}
+
+#' Compute doubly robust scores for a causal survival forest.
+#'
+#' For details see section 3.2 and equation (20) in the causal survival forest paper.
 #'
 #' @param forest A trained causal survival forest.
 #' @param subset Specifies subset of the training examples over which we
@@ -306,12 +287,24 @@ get_scores.instrumental_forest <- function(forest,
 #'               the treatment Wi or the outcome Yi.
 #' @param ... Additional arguments (currently ignored).
 #'
+#' @return A vector of scores.
+#'
 #' @method get_scores causal_survival_forest
 #' @export
 get_scores.causal_survival_forest <- function(forest,
                                               subset = NULL,
                                               ...) {
   subset <- validate_subset(forest, subset)
+
+  if (min(forest$W.hat[subset]) <= 0.05 || max(forest$W.hat[subset]) >= 0.95) {
+    rng <- range(forest$W.hat[subset])
+    warning(paste0(
+      "Estimated treatment propensities take values very close to 0 or 1.",
+      " The estimated propensities are between ",
+      round(rng[1], 3), " and ", round(rng[2], 3),
+      ", meaning some estimates may not be well identified."
+    ))
+  }
 
   eta <- forest$eta
   numerator.one <- eta$numerator.one[subset]

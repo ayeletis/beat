@@ -7,42 +7,23 @@
 #' Y(1) and Y(0) are potental outcomes corresponding to the two possible
 #' treatment states.
 #'
-#' @section Statistical details:
-#' An important assumption for identifying the conditional average treatment effect tau(X)
-#' is that there exists a fixed positive constant M such that the probability of observing an
-#' event time past the maximum follow-up time Y.max is at least M (formally, we assume: P(Y
-#' >= Y.max | X) > M).
 #'
-#' This means that the individual censoring probabilities (by default estimated using a
-#' survival_forest on D' = 1 - D) should not get too low. This function provides a warning
-#' if these estimates get below 0.2, if they drop all the way down to below 0.05, we emit a
-#' stronger warning that you can not expect causal survival forest to deliver reliable
-#' estimates.
-#'
-#' The practical issue is that we can not reliably extrapolate the survival curves
-#' sufficiently far into the future (where most observations will be censored). A workaround
-#' is to re-define the estimand as the treatment effect up to some suitable maximum
-#' follow-up time Y.max. One can do this in practice by thresholding Y before running
-#' causal_survival_forest: D[Y >= Y.max] = 1 and Y[Y >= Y.max] = Y.max. The online vignette on
-#' survival data has more details.
-#'
-#' @section Computational details:
-#' Causal survival forest computes two nuisance components, the estimated survival
-#' and censoring curves (S.hat and C.hat). Recall that the Kaplan-Meier or
-#' Nelson-Aalen estimates of the survival curve is a step function that only
-#' changes at points at which there is an event D = 1 (or D' = 1 - D for the
-#' censoring curve). For very dense event data Y there may not be any accuracy
-#' benefit to fitting these curves on the complete grid compared with the
-#' computational cost, which scales as O(m*n) in each tree node (where
-#' m is the number of events in the node, and n the number of split points).
-#'
-#' The suggested resolution to this issue is to round or relabel the event data Y
-#' to a coarser resolution. The argument `failure.times` can be used for this purpose.
+#' An important assumption for identifying the conditional average treatment effect
+#' tau(X) is that there exists a fixed positive constant M such that the probability
+#' of observing an event time past the maximum follow-up time Y.max is at least M.
+#' This may be an issue with data where most endpoint observations are censored.
+#' The suggested resolution is to re-define the estimand as the treatment effect up
+#' to some suitable maximum follow-up time Y.max. One can do this in practice by
+#' thresholding Y before running causal_survival_forest: `D[Y >= Y.max] <- 1` and
+#' `Y[Y >= Y.max] <- Y.max`. For details see Cui et al. (2020). The computational
+#' complexity of this estimator scales with the cardinality of the event times Y.
+#' If the number of samples is large and the Y grid dense, consider rounding the
+#' event times (or supply a coarser grid with the `failure.times` argument).
 #'
 #' @param X The covariates.
 #' @param Y The event time (may be negative).
 #' @param W The treatment assignment (must be a binary vector with no NAs).
-#' @param D The event type (0: censoring, 1: failure).
+#' @param D The event type (0: censored, 1: failure).
 #' @param W.hat Estimates of the treatment propensities E[W | Xi]. If W.hat = NULL,
 #'              these are estimated using a separate regression forest. Default is NULL.
 #' @param E1.hat Estimates of the expected survival time conditional on being treated
@@ -97,8 +78,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -107,11 +87,11 @@
 #'  tree is skipped and does not contribute to the estimate). Setting this to FALSE may improve performance on
 #'  small/marginally powered data, but requires more trees (note: tuning does not adjust the number of trees).
 #'  Only applies if honesty is enabled. Default is TRUE.
-#' @param alpha A tuning parameter that controls the maximum imbalance of a split. Default is 0.05
-#'  (meaning the count of failures on each side of a split has to be at least 5 \% of the total observation count in a node)
+#' @param alpha A tuning parameter that controls the maximum imbalance of a split. Default is 0.05.
 #' @param imbalance.penalty A tuning parameter that controls how harshly imbalanced splits are penalized. Default is 0.
 #' @param stabilize.splits Whether or not the treatment and censoring status should be taken into account when
-#'                         determining the imbalance of a split. Default is TRUE.
+#'  determining the imbalance of a split. The requirement for valid split candidates is the same as in causal_forest
+#'  with the additional constraint that num.failures(child) >= num.samples(parent) * alpha. Default is TRUE.
 #' @param ci.group.size The forest will grow ci.group.size trees on each subsample.
 #'                      In order to provide confidence intervals, ci.group.size must
 #'                      be at least 2. Default is 2.
@@ -127,6 +107,10 @@
 #' @param seed The seed of the C++ random number generator.
 #'
 #' @return A trained causal_survival_forest forest object.
+#'
+#' @references Cui, Yifan, Michael R. Kosorok, Erik Sverdrup, Stefan Wager, and Ruoqing Zhu.
+#'  "Estimating Heterogeneous Treatment Effects with Right-Censored Data via Causal Survival Forests."
+#'  arXiv preprint arXiv:2001.09887, 2020.
 #'
 #' @examples
 #' \donttest{
@@ -158,6 +142,9 @@
 #' points(X.test[, 1], cs.pred$predictions)
 #' lines(X.test[, 1], cs.pred$predictions + 2 * sqrt(cs.pred$variance.estimates), lty = 2)
 #' lines(X.test[, 1], cs.pred$predictions - 2 * sqrt(cs.pred$variance.estimates), lty = 2)
+#'
+#' # Compute a doubly robust estimate of the average treatment effect.
+#' average_treatment_effect(cs.forest)
 #'
 #' # Compute the best linear projection on the first covariate.
 #' best_linear_projection(cs.forest, X[, 1])
@@ -204,24 +191,27 @@ causal_survival_forest <- function(X, Y, W, D,
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
-  if(!all(W %in% c(0, 1))) {
+  if (!all(W %in% c(0, 1))) {
     stop("The treatment values can only be 0 or 1.")
   }
-  if(!all(D %in% c(0, 1))) {
+  if (!all(D %in% c(0, 1))) {
     stop("The censor values can only be 0 or 1.")
+  }
+  if (sum(D) == 0) {
+    stop("All observations are censored.")
   }
   if (is.null(failure.times)) {
     Y.grid <- sort(unique(Y))
   } else {
+    if (is.unsorted(failure.times, strictly = TRUE)) {
+      stop("Argument `failure.times` should be a vector with elements in increasing order.")
+    }
     Y.grid <- failure.times
   }
-  Y.relabeled <- findInterval(Y, Y.grid)
-  num.events <- length(Y.grid)
-  num.samples <- nrow(X)
-  if (num.events <= 2) {
+  if (length(Y.grid) <= 2) {
     stop("The number of distinct event times should be more than 2.")
   }
-  if (num.samples > 5000 && num.events / num.samples > 0.1) {
+  if (nrow(X) > 5000 && length(Y.grid) / nrow(X) > 0.1) {
     warning(paste0("The number of events are more than 10% of the sample size. ",
                    "To reduce the computational burden of fitting survival and ",
                    "censoring curves, consider rounding the event values `Y` or ",
@@ -252,14 +242,16 @@ causal_survival_forest <- function(X, Y, W, D,
     forest.W <- do.call(regression_forest, args.orthog)
     W.hat <- predict(forest.W)$predictions
   } else if (length(W.hat) == 1) {
-    W.hat <- rep(W.hat, num.samples)
-  } else if (length(W.hat) != num.samples) {
+    W.hat <- rep(W.hat, nrow(X))
+  } else if (length(W.hat) != nrow(X)) {
     stop("W.hat has incorrect length.")
   }
   W.centered <- W - W.hat
 
   args.nuisance <- list(failure.times = failure.times,
                         num.trees = max(50, num.trees / 4),
+                        sample.weights = sample.weights,
+                        clusters = clusters,
                         equalize.cluster.weights = equalize.cluster.weights,
                         sample.fraction = sample.fraction,
                         mtry = mtry,
@@ -276,15 +268,14 @@ causal_survival_forest <- function(X, Y, W, D,
   # The survival function conditioning on being treated S(t, x, 1) estimated with an "S-learner".
   if (is.null(E1.hat)) {
     sf.survival <- do.call(survival_forest, c(list(X = cbind(X, W), Y = Y, D = D), args.nuisance))
-    S1.failure.times <- S0.failure.times <- S.failure.times <- sf.survival$failure.times
+    S1.failure.times <- S0.failure.times <- sf.survival$failure.times
     # Computing OOB estimates for modified training samples is not a workflow we have implemented,
     # so we do it with a manual workaround here. Note that compute.oob.predictions has to be FALSE.
-    X.orig <- sf.survival[["X.orig"]]
-    sf.survival[["X.orig"]] <- cbind(X, rep(1, num.samples))
+    sf.survival[["X.orig"]][, ncol(X) + 1] <- rep(1, nrow(X))
     S1.hat <- predict(sf.survival)$predictions
-    sf.survival[["X.orig"]] <- X.orig
+    sf.survival[["X.orig"]][, ncol(X) + 1] <- W
     E1.hat <- expected_survival(S1.hat, S1.failure.times)
-  } else if (length(E1.hat) != num.samples) {
+  } else if (length(E1.hat) != nrow(X)) {
     stop("E1.hat has incorrect length.")
   }
 
@@ -292,14 +283,13 @@ causal_survival_forest <- function(X, Y, W, D,
   if (is.null(E0.hat)) {
     if (!exists("sf.survival", inherits = FALSE)) {
       sf.survival <- do.call(survival_forest, c(list(X = cbind(X, W), Y = Y, D = D), args.nuisance))
-      S0.failure.times <- S.failure.times <- sf.survival$failure.times
+      S0.failure.times <- sf.survival$failure.times
     }
-    X.orig <- sf.survival[["X.orig"]]
-    sf.survival[["X.orig"]] <- cbind(X, rep(0, num.samples))
+    sf.survival[["X.orig"]][, ncol(X) + 1] <- rep(0, nrow(X))
     S0.hat <- predict(sf.survival)$predictions
-    sf.survival[["X.orig"]] <- X.orig
+    sf.survival[["X.orig"]][, ncol(X) + 1] <- W
     E0.hat <- expected_survival(S0.hat, S0.failure.times)
-  } else if (length(E0.hat) != num.samples) {
+  } else if (length(E0.hat) != nrow(X)) {
     stop("E0.hat has incorrect length.")
   }
   # Compute m(x) = e(X) E[T | X, W = 1] + (1 - e(X)) E[T | X, W = 0]
@@ -309,13 +299,12 @@ causal_survival_forest <- function(X, Y, W, D,
   if (is.null(S.hat)) {
     if (!exists("sf.survival", inherits = FALSE)) {
       sf.survival <- do.call(survival_forest, c(list(X = cbind(X, W), Y = Y, D = D), args.nuisance))
-      S.failure.times <- sf.survival$failure.times
     }
     # We want the predicted survival curves S.hat and C.hat on the common grid Y.grid:
     S.hat <- predict(sf.survival, failure.times = Y.grid)$predictions
-  } else if (NROW(S.hat) != num.samples) {
+  } else if (NROW(S.hat) != nrow(X)) {
     stop("S.hat has incorrect length.")
-  } else if (NCOL(S.hat) != num.events) {
+  } else if (NCOL(S.hat) != length(Y.grid)) {
     stop("S.hat has incorrect number of columns (should be equal to the number of events).")
   }
 
@@ -323,9 +312,9 @@ causal_survival_forest <- function(X, Y, W, D,
   if (is.null(C.hat)) {
     sf.censor <- do.call(survival_forest, c(list(X = cbind(X, W), Y = Y, D = 1 - D), args.nuisance))
     C.hat <- predict(sf.censor, failure.times = Y.grid)$predictions
-  } else if (NROW(C.hat) != num.samples) {
+  } else if (NROW(C.hat) != nrow(X)) {
     stop("C.hat has incorrect length.")
-  } else if (NCOL(C.hat) != num.events) {
+  } else if (NCOL(C.hat) != length(Y.grid)) {
     stop("C.hat has incorrect number of columns (should be equal to the number of events).")
   }
 
@@ -333,22 +322,22 @@ causal_survival_forest <- function(X, Y, W, D,
     stop("Some censoring probabilites are exactly zero.")
   }
 
- if (any(C.hat <= 0.05)) {
-  warning(paste("Estimated censoring probabilites go as low as:", min(C.hat),
-                "- an identifying assumption is that there exists a fixed positve constant M",
+  if (any(C.hat <= 0.05)) {
+    warning(paste("Estimated censoring probabilites go as low as:", min(C.hat),
+                "- an identifying assumption is that there exists a fixed positive constant M",
                 "such that the probability of observing an event time past the maximum follow-up time Y.max",
                 "is at least M. Formally, we assume: P(Y >= Y.max | X) > M.",
                 "This warning appears when M is less than 0.05, at which point causal survival forest",
                 "can not be expected to deliver reliable estimates."))
   } else if (any(C.hat < 0.2 & C.hat > 0.05)) {
     warning(paste("Estimated censoring probabilites are lower than 0.2.",
-                  "An identifying assumption is that there exists a fixed positve constant M",
+                  "An identifying assumption is that there exists a fixed positive constant M",
                   "such that the probability of observing an event time past the maximum follow-up time Y.max",
                   "is at least M. Formally, we assume: P(Y >= Y.max | X) > M."))
   }
 
   # Compute the pseudo outcomes
-  eta <- compute_eta(S.hat, C.hat, lambda.C.hat, Y.grid, Y, Y.relabeled, D, m.hat, W.centered)
+  eta <- compute_eta(S.hat, C.hat, lambda.C.hat, Y.grid, Y, D, m.hat, W.centered)
   validate_observations(eta[["numerator"]], X)
   validate_observations(eta[["denominator"]], X)
 
@@ -441,6 +430,9 @@ causal_survival_forest <- function(X, Y, W, D,
 #' lines(X.test[, 1], cs.pred$predictions + 2 * sqrt(cs.pred$variance.estimates), lty = 2)
 #' lines(X.test[, 1], cs.pred$predictions - 2 * sqrt(cs.pred$variance.estimates), lty = 2)
 #'
+#' # Compute a doubly robust estimate of the average treatment effect.
+#' average_treatment_effect(cs.forest)
+#'
 #' # Compute the best linear projection on the first covariate.
 #' best_linear_projection(cs.forest, X[, 1])
 #'
@@ -460,9 +452,7 @@ predict.causal_survival_forest <- function(object,
                                            ...) {
   # If possible, use pre-computed predictions.
   if (is.null(newdata) && !estimate.variance && !is.null(object$predictions)) {
-    return(data.frame(predictions = object$predictions,
-                      debiased.error = object$debiased.error,
-                      excess.error = object$excess.error))
+    return(data.frame(predictions = object$predictions))
   }
 
   num.threads <- validate_num_threads(num.threads)
@@ -484,6 +474,7 @@ predict.causal_survival_forest <- function(object,
   }
 
   # Convert list to data frame.
+  ret <- ret[c(1, 2)] # the last two entries are unused error estimates
   empty <- sapply(ret, function(elem) length(elem) == 0)
   do.call(cbind.data.frame, ret[!empty])
 }
@@ -510,7 +501,6 @@ predict.causal_survival_forest <- function(object,
 #' @param lambda.C.hat Estimates of the conditional hazard function for the censoring process S_C(t, x, w).
 #' @param Y.grid The time values corresponding to S.hat and C.hat.
 #' @param Y The event times.
-#' @param Y.relabeled The event time values relabeled to consecutive integers 1 to length(Y.grid).
 #' @param D The censoring indicator.
 #' @param m.hat Estimates of m(X).
 #' @param W.centered W - W.hat.
@@ -521,10 +511,11 @@ compute_eta <- function(S.hat,
                         lambda.C.hat,
                         Y.grid,
                         Y,
-                        Y.relabeled,
                         D,
                         m.hat,
                         W.centered) {
+  # The event time values relabeled to consecutive integers 0/1 to length(Y.grid).
+  Y.relabeled <- findInterval(Y, Y.grid)
   # S.hat and C.hat will have the same dimensions,
   # they are survival estimates corresponding to the same grid Y.grid.
   num.samples <- nrow(S.hat)

@@ -39,6 +39,10 @@ namespace grf
     this->num_small_z = new size_t[max_num_unique_values];
     this->sums_z = new double[max_num_unique_values];
     this->sums_z_squared = new double[max_num_unique_values];
+
+    // this->  arma::vec target_weight_sum(num_target_weight_cols);
+    // this-> arma::mat target_weight_left_sum(num_target_weight_cols, num_samples); // column major
+
   }
 
   BalancedInstrumentalSplittingRule::~BalancedInstrumentalSplittingRule()

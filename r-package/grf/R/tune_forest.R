@@ -1,4 +1,4 @@
-#' Tune a balanced forest
+#' Tune a forest
 #'
 #' Finds the optimal parameters to be used in training a forest.
 #'
@@ -8,37 +8,34 @@
 #' @param args The remaining call arguments for the forest.
 #' @param tune.parameters The vector of parameter names to tune.
 #' @param tune.parameters.defaults The grf default values for the vector of parameter names to tune.
-#' @param num.fit.trees The number of trees in each 'mini forest' used to fit the tuning model.
-#' @param num.fit.reps The number of forests used to fit the tuning model.
-#' @param num.optimize.reps The number of random parameter values considered when using the model
+#' @param tune.num.trees The number of trees in each 'mini forest' used to fit the tuning model.
+#' @param tune.num.reps The number of forests used to fit the tuning model.
+#' @param tune.num.draws The number of random parameter values considered when using the model
 #'  to select the optimal parameters.
 #' @param train The grf forest training function.
 #'
 #' @return tuning output
 #'
-#' @importFrom stats sd runif
-#' @importFrom utils capture.output
 #' @keywords internal
-tune_balanced_forest <- function(data,
+tune_forest <- function(data,
                         nrow.X,
                         ncol.X,
                         args,
                         tune.parameters,
                         tune.parameters.defaults,
-                        tune.parameters.userinput,
-                        num.fit.trees,
-                        num.fit.reps,
-                        num.optimize.reps,
+                        tune.num.trees,
+                        tune.num.reps,
+                        tune.num.draws,
                         train) {
   fit.parameters <- args[!names(args) %in% tune.parameters]
-  fit.parameters[["num.trees"]] <- num.fit.trees
+  fit.parameters[["num.trees"]] <- tune.num.trees
   fit.parameters[["ci.group.size"]] <- 1
   fit.parameters[["compute.oob.predictions"]] <- TRUE
 
   # 1. Train several mini-forests, and gather their debiased OOB error estimates.
   num.params <- length(tune.parameters)
-  unif <- with_seed(runif(num.fit.reps * num.params), seed = args$seed)
-  fit.draws <- matrix(unif, num.fit.reps, num.params,
+  unif <- with_seed(runif(tune.num.reps * num.params), seed = args$seed)
+  fit.draws <- matrix(unif, tune.num.reps, num.params,
                       dimnames = list(NULL, tune.parameters))
 
   small.forest.errors <- apply(fit.draws, 1, function(draw) {
@@ -48,10 +45,10 @@ tune_balanced_forest <- function(data,
     mean(error, na.rm = TRUE)
   })
 
-  if (any(is.na(small.forest.errors))) {
+  if (anyNA(small.forest.errors)) {
     warning(paste0(
       "Could not tune forest because some small forest error estimates were NA.\n",
-      "Consider increasing tuning argument num.fit.trees."))
+      "Consider increasing tuning argument tune.num.trees."))
     out <- get_tuning_output(params = c(tune.parameters.defaults), status = "failure")
     return(out)
   }
@@ -59,7 +56,7 @@ tune_balanced_forest <- function(data,
   if (sd(small.forest.errors) == 0 || sd(small.forest.errors) / mean(small.forest.errors) < 1e-10) {
     warning(paste0(
       "Could not tune forest because small forest errors were nearly constant.\n",
-      "Consider increasing argument num.fit.trees."))
+      "Consider increasing argument tune.num.trees."))
     out <- get_tuning_output(params = c(tune.parameters.defaults), status = "failure")
     return(out)
   }
@@ -67,7 +64,7 @@ tune_balanced_forest <- function(data,
   # 2. Fit the 'dice kriging' model to these error estimates.
   variance.guess <- rep(var(small.forest.errors) / 2, nrow(fit.draws))
   kriging.model <- tryCatch({
-    capture.output(
+    utils::capture.output(
       with_seed(
         model <- DiceKriging::km(
           design = data.frame(fit.draws),
@@ -91,8 +88,8 @@ tune_balanced_forest <- function(data,
 
   # 3. To determine the optimal parameter values, predict using the kriging model at a large
   # number of random values, then select those that produced the lowest error.
-  unif <- with_seed(runif(num.optimize.reps * num.params), seed = args$seed)
-  optimize.draws <- matrix(unif, num.optimize.reps, num.params,
+  unif <- with_seed(runif(tune.num.draws * num.params), seed = args$seed)
+  optimize.draws <- matrix(unif, tune.num.draws, num.params,
                            dimnames = list(NULL, tune.parameters))
   model.surface <- predict(kriging.model, newdata = data.frame(optimize.draws), type = "SK")$mean
   tuned.params <- get_params_from_draw(nrow.X, ncol.X, optimize.draws)
@@ -101,7 +98,7 @@ tune_balanced_forest <- function(data,
 
   # To avoid the possibility of selection bias, re-train a moderately-sized forest
   # at the value chosen by the method above
-  fit.parameters[["num.trees"]] <- num.fit.trees * 4
+  fit.parameters[["num.trees"]] <- tune.num.trees * 4
   retrained.forest.params <- grid[small.forest.optimal.draw, -1]
   retrained.forest <- do.call.rcpp(train, c(data, fit.parameters, retrained.forest.params))
   retrained.forest.error <- mean(retrained.forest$debiased.error, na.rm = TRUE)
@@ -111,48 +108,21 @@ tune_balanced_forest <- function(data,
   default.forest <- do.call.rcpp(train, c(data, fit.parameters, tune.parameters.defaults))
   default.forest.error <- mean(default.forest$debiased.error, na.rm = TRUE)
 
-  # 5. check user input parameters
-
-  user.forest <- do.call.rcpp(train, c(data, fit.parameters, tune.parameters.userinput))
-  user.forest.error <- mean(user.forest$debiased.error, na.rm = TRUE)
-  # print(tune.parameters.userinput)
-  results =list(list('error'=default.forest.error,
-                     'params'=tune.parameters.defaults,
-                      grid=NA,
-                      status='default'),
-                list('error' =retrained.forest.error,
-                     'params' = sapply(retrained.forest.params, list),
-                     grid=grid,
-                     status='tuned'),
-                list('error' =user.forest.error,
-                     'params'=tune.parameters.userinput,
-                     grid=NA,
-                     status='user_input'))
-
-  best = which.max(c(default.forest.error,retrained.forest.error,user.forest.error))
-  # print(sprintf("user input error: %s default input error %s tuning parameters error %s",
-  #               user.forest.error, default.forest.error,retrained.forest.error))
-  out <- get_tuning_output(
-    error = results[[best]]$error,
-    params=results[[best]]$params,
-    grid=results[[best]]$grid,
-    status = results[[best]]$status
-  )
-  # if (default.forest.error < retrained.forest.error) {
-  #   out <- get_tuning_output(
-  #     error = default.forest.error,
-  #     params = tune.parameters.defaults,
-  #     grid = NA,
-  #     status = "default"
-  #   )
-  # } else {
-  #   out <- get_tuning_output(
-  #     error = retrained.forest.error,
-  #     params = retrained.forest.params,
-  #     grid = grid,
-  #     status = "tuned"
-  #   )
-  # }
+  if (default.forest.error < retrained.forest.error) {
+    out <- get_tuning_output(
+      error = default.forest.error,
+      params = tune.parameters.defaults,
+      grid = NA,
+      status = "default"
+    )
+  } else {
+    out <- get_tuning_output(
+      error = retrained.forest.error,
+      params = retrained.forest.params,
+      grid = grid,
+      status = "tuned"
+    )
+  }
 
   out
 }
@@ -177,9 +147,9 @@ get_params_from_draw <- function(nrow.X, ncol.X, draws) {
       return(0.5 + (0.8 - 0.5) * draws[, param]) # honesty.fraction in U(0.5, 0.8)
     } else if (param == "honesty.prune.leaves") {
       return(ifelse(draws[, param] < 0.5, TRUE, FALSE))
-    } else if (param=='target.weight.penalty') {
-      return(pmin(gamma(draws[,param]), 10)) # [0, 100]
-    }else {
+    } else if (param=='target.weight.penalty') { # penalty for target weight matrix
+      return(pmin(gamma(draws[,param]), 10))
+    } else {
       stop("Unrecognized parameter name provided: ", param)
     }
   }, FUN.VALUE = numeric(n))

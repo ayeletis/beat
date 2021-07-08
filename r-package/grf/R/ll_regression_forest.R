@@ -1,4 +1,4 @@
-#' Local Linear forest
+#' Local linear forest
 #'
 #' Trains a local linear forest that can be used to estimate
 #' the conditional mean function mu(x) = E[Y | X = x]
@@ -18,8 +18,6 @@
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
-#' @param sample.weights Weights given to an observation in estimation.
-#'                       If NULL, each observation is given the same weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
 #'  Default is NULL (ignored).
 #' @param equalize.cluster.weights If FALSE, each unit is given the same weight (so that bigger
@@ -28,9 +26,7 @@
 #'  smallest cluster has K units, then when we sample a cluster during training, we only give a random
 #'  K elements of the cluster to the tree-growing procedure. When estimating average treatment effects,
 #'  each observation is given weight 1/cluster size, so that the total weight of each cluster is the
-#'  same. Note that, if this argument is FALSE, sample weights may also be directly adjusted via the
-#'  sample.weights argument. If this argument is TRUE, sample.weights must be set to NULL. Default is
-#'  FALSE.
+#'  same. Default is FALSE.
 #' @param sample.fraction Fraction of the data used to build each tree.
 #'                        Note: If honesty = TRUE, these subsamples will
 #'                        further be cut by a factor of honesty.fraction. Default is 0.5.
@@ -41,8 +37,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -58,7 +53,7 @@
 #'                      be at least 2. Default is 1.
 #' @param tune.parameters If true, NULL parameters are tuned by cross-validation; if FALSE
 #'                        NULL parameters are set to defaults. Default is FALSE. Currently, local linear tuning
-#'                        does not take local linear splits into account.
+#'                        is based on regression forest fit, and is only supported for `enable.ll.split = FALSE`.
 #' @param tune.num.trees The number of trees in each 'mini forest' used to fit the tuning model. Default is 10.
 #' @param tune.num.reps The number of forests used to fit the tuning model. Default is 100.
 #' @param tune.num.draws The number of random parameter values considered when using the model
@@ -87,7 +82,6 @@ ll_regression_forest <- function(X, Y,
                                 ll.split.variables = NULL,
                                 ll.split.cutoff = NULL,
                                 num.trees = 2000,
-                                sample.weights = NULL,
                                 clusters = NULL,
                                 equalize.cluster.weights = FALSE,
                                 sample.fraction = 0.5,
@@ -107,10 +101,9 @@ ll_regression_forest <- function(X, Y,
                                 seed = runif(1, 0, .Machine$integer.max)) {
 
   has.missing.values <- validate_X(X)
-  validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
   clusters <- validate_clusters(clusters, X)
-  samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
+  samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, NULL)
   num.threads <- validate_num_threads(num.threads)
 
   ll.split.variables <- validate_ll_vars(ll.split.variables, ncol(X))
@@ -119,8 +112,17 @@ ll_regression_forest <- function(X, Y,
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty")
+  default.parameters <- list(sample.fraction = 0.5,
+                             mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                             min.node.size = 5,
+                             honesty.fraction = 0.5,
+                             honesty.prune.leaves = TRUE,
+                             alpha = 0.05,
+                             imbalance.penalty = 0)
 
-  data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
+  # The ll_regression train wrapper signature does not contain sample weights, which is why sample.weights=FALSE,
+  # whereas the regression_train wrapper signature does, and specifying sample.weights=NULL disables them.
+  data <- create_train_matrices(X, outcome = Y, sample.weights = if (enable.ll.split) FALSE else NULL)
 
   args <- list(num.trees = num.trees,
                clusters = clusters,
@@ -161,27 +163,31 @@ ll_regression_forest <- function(X, Y,
   }
 
   tuning.output <- NULL
-  if (!identical(tune.parameters, "none")){
-    tuning.output <- tune_regression_forest(X, Y,
-                                            sample.weights = sample.weights,
-                                            clusters = clusters,
-                                            equalize.cluster.weights = equalize.cluster.weights,
-                                            sample.fraction = sample.fraction,
-                                            mtry = mtry,
-                                            min.node.size = min.node.size,
-                                            honesty = honesty,
-                                            honesty.fraction = honesty.fraction,
-                                            honesty.prune.leaves = honesty.prune.leaves,
-                                            alpha = alpha,
-                                            imbalance.penalty = imbalance.penalty,
-                                            ci.group.size = ci.group.size,
-                                            tune.parameters = tune.parameters,
-                                            tune.num.trees = tune.num.trees,
-                                            tune.num.reps = tune.num.reps,
-                                            tune.num.draws = tune.num.draws,
-                                            num.threads = num.threads,
-                                            seed = seed)
-    args <- modifyList(args, as.list(tuning.output[["params"]]))
+  if (!identical(tune.parameters, "none")) {
+    if (enable.ll.split) {
+      stop("Tuning is currently only supported when enable.ll.split = FALSE.")
+    }
+    if (identical(tune.parameters, "all")) {
+      tune.parameters <- all.tunable.params
+    } else {
+      tune.parameters <- unique(match.arg(tune.parameters, all.tunable.params, several.ok = TRUE))
+    }
+    if (!honesty) {
+      tune.parameters <- tune.parameters[!grepl("honesty", tune.parameters)]
+    }
+    tune.parameters.defaults <- default.parameters[tune.parameters]
+    tuning.output <- tune_forest(data = data,
+                                 nrow.X = nrow(X),
+                                 ncol.X = ncol(X),
+                                 args = args,
+                                 tune.parameters = tune.parameters,
+                                 tune.parameters.defaults = tune.parameters.defaults,
+                                 tune.num.trees = tune.num.trees,
+                                 tune.num.reps = tune.num.reps,
+                                 tune.num.draws = tune.num.draws,
+                                 train = regression_train)
+
+    args <- utils::modifyList(args, as.list(tuning.output[["params"]]))
   }
 
   if (enable.ll.split) {
@@ -194,7 +200,6 @@ ll_regression_forest <- function(X, Y,
   forest[["ci.group.size"]] <- ci.group.size
   forest[["X.orig"]] <- X
   forest[["Y.orig"]] <- Y
-  forest[["sample.weights"]] <- sample.weights
   forest[["clusters"]] <- clusters
   forest[["equalize.cluster.weights"]] <- equalize.cluster.weights
   forest[["tunable.params"]] <- args[all.tunable.params]
@@ -219,7 +224,7 @@ ll_regression_forest <- function(X, Y,
 #'                   We run a locally weighted linear regression on the included variables.
 #'                   Please note that this is a beta feature still in development, and may slow down
 #'                   prediction considerably. Defaults to NULL.
-#' @param ll.lambda Ridge penalty for local linear predictions
+#' @param ll.lambda Ridge penalty for local linear predictions. Defaults to NULL and will be cross-validated.
 #' @param ll.weight.penalty Option to standardize ridge penalty by covariance (TRUE),
 #'                            or penalize all covariates equally (FALSE). Defaults to FALSE.
 #' @param num.threads Number of threads used in training. If set to NULL, the software

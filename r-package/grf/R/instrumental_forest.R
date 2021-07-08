@@ -44,8 +44,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -139,6 +138,13 @@ instrumental_forest <- function(X, Y, W, Z,
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty")
+  default.parameters <- list(sample.fraction = 0.5,
+                             mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                             min.node.size = 5,
+                             honesty.fraction = 0.5,
+                             honesty.prune.leaves = TRUE,
+                             alpha = 0.05,
+                             imbalance.penalty = 0)
 
   args.orthog = list(X = X,
                      num.trees = min(500, num.trees),
@@ -186,7 +192,7 @@ instrumental_forest <- function(X, Y, W, Z,
   }
 
   data <- create_train_matrices(X, outcome = Y - Y.hat, treatment = W - W.hat,
-                               instrument = Z - Z.hat, sample.weights = sample.weights)
+                                instrument = Z - Z.hat, sample.weights = sample.weights)
   args <- list(num.trees = num.trees,
               clusters = clusters,
               samples.per.cluster = samples.per.cluster,
@@ -206,29 +212,28 @@ instrumental_forest <- function(X, Y, W, Z,
               seed = seed)
 
   tuning.output <- NULL
-  if (!identical(tune.parameters, "none")){
-    tuning.output <- tune_instrumental_forest(X, Y, W, Z, Y.hat, W.hat, Z.hat,
-                                              sample.weights = sample.weights,
-                                              clusters = clusters,
-                                              equalize.cluster.weights = equalize.cluster.weights,
-                                              sample.fraction = sample.fraction,
-                                              mtry = mtry,
-                                              min.node.size = min.node.size,
-                                              honesty = honesty,
-                                              honesty.fraction = honesty.fraction,
-                                              honesty.prune.leaves = honesty.prune.leaves,
-                                              alpha = alpha,
-                                              imbalance.penalty = imbalance.penalty,
-                                              stabilize.splits = stabilize.splits,
-                                              ci.group.size = ci.group.size,
-                                              reduced.form.weight = reduced.form.weight,
-                                              tune.parameters = tune.parameters,
-                                              tune.num.trees = tune.num.trees,
-                                              tune.num.reps = tune.num.reps,
-                                              tune.num.draws = tune.num.draws,
-                                              num.threads = num.threads,
-                                              seed = seed)
-    args <- modifyList(args, as.list(tuning.output[["params"]]))
+  if (!identical(tune.parameters, "none")) {
+    if (identical(tune.parameters, "all")) {
+      tune.parameters <- all.tunable.params
+    } else {
+      tune.parameters <- unique(match.arg(tune.parameters, all.tunable.params, several.ok = TRUE))
+    }
+    if (!honesty) {
+      tune.parameters <- tune.parameters[!grepl("honesty", tune.parameters)]
+    }
+    tune.parameters.defaults <- default.parameters[tune.parameters]
+    tuning.output <- tune_forest(data = data,
+                                 nrow.X = nrow(X),
+                                 ncol.X = ncol(X),
+                                 args = args,
+                                 tune.parameters = tune.parameters,
+                                 tune.parameters.defaults = tune.parameters.defaults,
+                                 tune.num.trees = tune.num.trees,
+                                 tune.num.reps = tune.num.reps,
+                                 tune.num.draws = tune.num.draws,
+                                 train = instrumental_train)
+
+    args <- utils::modifyList(args, as.list(tuning.output[["params"]]))
   }
 
   forest <- do.call.rcpp(instrumental_train, c(data, args))
@@ -310,21 +315,16 @@ predict.instrumental_forest <- function(object, newdata = NULL,
   Z.centered <- object[["Z.orig"]] - object[["Z.hat"]]
 
   train.data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered, instrument = Z.centered)
+  args <- list(forest.object = forest.short,
+               num.threads = num.threads,
+               estimate.variance = estimate.variance)
 
   if (!is.null(newdata)) {
-    validate_newdata(newdata, object$X.orig, allow.na = TRUE)
-    data <- create_train_matrices(newdata)
-    ret <- instrumental_predict(
-      forest.short, train.data$train.matrix, train.data$sparse.train.matrix,
-      train.data$outcome.index, train.data$treatment.index, train.data$instrument.index,
-      data$train.matrix, data$sparse.train.matrix, num.threads, estimate.variance
-    )
+    validate_newdata(newdata, X, allow.na = TRUE)
+    test.data <- create_test_matrices(newdata)
+    ret <- do.call.rcpp(instrumental_predict, c(train.data, test.data, args))
   } else {
-    ret <- instrumental_predict_oob(
-      forest.short, train.data$train.matrix, train.data$sparse.train.matrix,
-      train.data$outcome.index, train.data$treatment.index, train.data$instrument.index,
-      num.threads, estimate.variance
-    )
+    ret <- do.call.rcpp(instrumental_predict_oob, c(train.data, args))
   }
 
   # Convert list to data frame.

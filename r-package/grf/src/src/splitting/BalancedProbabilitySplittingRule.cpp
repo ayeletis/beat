@@ -42,7 +42,7 @@ namespace grf
     this->counter_per_class = new double[num_classes * max_num_unique_values];
   }
 
-  BalancedProbabilitySplittingRule::~BalancedProbabilitySplittingRulesssssss()
+  BalancedProbabilitySplittingRule::~BalancedProbabilitySplittingRule()
   {
     if (counter != nullptr)
     {
@@ -210,7 +210,7 @@ namespace grf
         // not necessary to evaluate sending right when splitting on NaN.
         if (i == 0 && !send_left)
         {
-!!          continue;
+          continue;
         }
 
         n_left += counter[i];

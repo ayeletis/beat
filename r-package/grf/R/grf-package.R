@@ -5,7 +5,7 @@
 #'
 #' Some helpful links for getting started:
 #'
-#' * The R package documentation contains usage examples and method reference (\url{https://grf-labs.github.io/grf}).
+#' * The R package documentation contains usage examples and method reference (\url{https://grf-labs.github.io/grf/}).
 #'
 #' * The GRF reference gives a detailed description of the GRF algorithm and includes troubleshooting suggestions (\url{https://grf-labs.github.io/grf/REFERENCE.html}).
 #'
@@ -44,8 +44,6 @@
 #' average_treatment_effect(tau.forest, target.sample = "all")
 #'
 #' # Estimate the conditional average treatment effect on the treated sample (CATT).
-#' # Here, we don't expect much difference between the CATE and the CATT, since
-#' # treatment assignment was randomized.
 #' average_treatment_effect(tau.forest, target.sample = "treated")
 #'
 #' # Add confidence intervals for heterogeneous treatment effects; growing more
@@ -95,5 +93,8 @@
 #'
 #' @useDynLib grf
 #' @importFrom Rcpp evalCpp
+#' @importFrom Matrix Matrix
+#' @importFrom stats coef lm predict sd var weighted.mean
+#' @importFrom stats dbeta rbinom rexp rnorm runif rpois
 #' @keywords internal
 "_PACKAGE"

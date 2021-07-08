@@ -5,11 +5,11 @@
 #' \itemize{
 #'   \item The average treatment effect (target.sample = all): E[Y(1) - Y(0)]
 #'   \item The average treatment effect on the treated (target.sample = treated): E[Y(1) - Y(0) | Wi = 1]
-#'   \item The average treatment effect on the controls (target.sample = control): : E[Y(1) - Y(0) | Wi = 0]
+#'   \item The average treatment effect on the controls (target.sample = control): E[Y(1) - Y(0) | Wi = 0]
 #'   \item The overlap-weighted average treatment effect (target.sample = overlap):
 #'   E[e(X) (1 - e(X)) (Y(1) - Y(0))] / E[e(X) (1 - e(X)), where e(x) = P[Wi = 1 | Xi = x].
 #' }
-#' This last estimand is recommended by Li, Morgan, and Zaslavsky (JASA, 2017)
+#' This last estimand is recommended by Li, Morgan, and Zaslavsky (2018)
 #' in case of poor overlap (i.e., when the propensities e(x) may be very close
 #' to 0 or 1), as it doesn't involve dividing by estimated propensities.
 #'
@@ -30,7 +30,7 @@
 #' and there are no "defiers", Imbens and Angrist (1994) show that tau(x) can
 #' be interpreted as an average treatment effect on compliers. This function
 #' provides and estimate of tau = E[tau(X)]. See Chernozhukov
-#' et al. (2016) for a discussion, and Section 5.2 of Athey and Wager (2017)
+#' et al. (2016) for a discussion, and Section 5.2 of Athey and Wager (2021)
 #' for an example using forests.
 #'
 #' If clusters are specified, then each unit gets equal weight by default. For
@@ -66,18 +66,20 @@
 #'               This is the number of trees used for this task. Note: this argument is only
 #'               used when debiasing.weights = NULL.
 #'
-#' @references Athey, Susan, and Stefan Wager. "Efficient policy learning."
-#'             arXiv preprint arXiv:1702.02896, 2017.
+#' @references Athey, Susan, and Stefan Wager. "Policy Learning With Observational Data."
+#'             Econometrica 89.1 (2021): 133-161.
 #' @references Chernozhukov, Victor, Juan Carlos Escanciano, Hidehiko Ichimura,
 #'             Whitney K. Newey, and James M. Robins. "Locally robust semiparametric
 #'             estimation." arXiv preprint arXiv:1608.00033, 2016.
 #' @references Imbens, Guido W., and Joshua D. Angrist. "Identification and Estimation of
 #'             Local Average Treatment Effects." Econometrica 62(2), 1994.
+#' @references Li, Fan, Kari Lock Morgan, and Alan M. Zaslavsky.
+#'             "Balancing covariates via propensity score weighting."
+#'             Journal of the American Statistical Association 113(521), 2018.
 #' @references Robins, James M., and Andrea Rotnitzky. "Semiparametric efficiency in
 #'             multivariate regression models with missing data." Journal of the
 #'             American Statistical Association 90(429), 1995.
 #'
-#' @importFrom stats coef lm predict var weighted.mean
 #' @examples
 #' \donttest{
 #' # Train a causal forest.
@@ -117,7 +119,6 @@
 #'
 #' @return An estimate of the average treatment effect, along with standard error.
 #'
-#' @importFrom stats coef lm predict var weighted.mean
 #' @export
 average_treatment_effect <- function(forest,
                                      target.sample = c("all", "treated", "control", "overlap"),
@@ -140,7 +141,7 @@ average_treatment_effect <- function(forest,
   clusters <- if (cluster.se) {
     forest$clusters
   } else {
-    1:length(forest$Y.orig)
+    1:NROW(forest$Y.orig)
   }
   observation.weight <- observation_weights(forest)
 
@@ -153,7 +154,7 @@ average_treatment_effect <- function(forest,
   }
 
   if (!is.null(debiasing.weights)) {
-    if (length(debiasing.weights) == length(forest$Y.orig)) {
+    if (length(debiasing.weights) == NROW(forest$Y.orig)) {
       debiasing.weights <- debiasing.weights[subset]
     } else if (length(debiasing.weights) != length(subset)) {
       stop("If specified, debiasing.weights must be a vector of length n or the subset length.")
@@ -193,25 +194,45 @@ average_treatment_effect <- function(forest,
   }
 
   if (method == "AIPW" && target.sample == "all") {
-
     # This is the most general workflow, that shares codepaths with best linear projection
     # and other average effect estimators.
 
-    if (any(c("causal_forest", "instrumental_forest") %in% class(forest))) {
+    .sigma2.hat <- function(DR.scores, tau.hat) {
+      correction.clust <- Matrix::sparse.model.matrix(~ factor(subset.clusters) + 0, transpose = TRUE) %*%
+        (sweep(as.matrix(DR.scores), 2, tau.hat, "-") * subset.weights)
+
+      Matrix::colSums(correction.clust^2) / sum(subset.weights)^2 *
+        nrow(correction.clust) / (nrow(correction.clust) - 1)
+    }
+
+    if (any(c("causal_forest", "instrumental_forest", "multi_arm_causal_forest", "causal_survival_forest")
+            %in% class(forest))) {
       DR.scores <- get_scores(forest, subset = subset, debiasing.weights = debiasing.weights,
                               compliance.score = compliance.score, num.trees.for.weights = num.trees.for.weights)
     } else {
       stop("Average treatment effects are not implemented for this forest type.")
     }
 
-    tau.hat <- weighted.mean(DR.scores, subset.weights)
-    correction.clust <- Matrix::sparse.model.matrix(
-      ~ factor(subset.clusters) + 0,
-      transpose = TRUE
-    ) %*% ((DR.scores - tau.hat) * subset.weights)
-    sigma2.hat <- sum(correction.clust^2) / sum(subset.weights)^2 *
-      length(correction.clust) / (length(correction.clust) - 1)
-    return(c(estimate = tau.hat, std.err = sqrt(sigma2.hat)))
+    if ("multi_arm_causal_forest" %in% class(forest)) {
+      tau.hats <- lapply(1:NCOL(forest$Y.orig), function(col) {
+        apply(DR.scores[, , col, drop = FALSE], 2, function(dr) weighted.mean(dr, subset.weights))
+      })
+      sigma2.hats <- lapply(1:NCOL(forest$Y.orig), function(col) {
+        .sigma2.hat(DR.scores[, , col], tau.hats[[col]])
+      })
+      out <- data.frame(
+        estimate = unlist(tau.hats),
+        std.err = sqrt(unlist(sigma2.hats)),
+        contrast = names(unlist(tau.hats)),
+        outcome = dimnames(DR.scores)[[3]][rep(1:NCOL(forest$Y.orig), each = dim(DR.scores)[2])],
+        stringsAsFactors = FALSE
+      )
+      return(out) # rownames will be `contrast` when suitable, allowing a convenient `ate["contrast", "estimate"]` access.
+    } else {
+      tau.hat <- weighted.mean(DR.scores, subset.weights)
+      sigma2.hat <- .sigma2.hat(DR.scores, tau.hat)
+      return(c(estimate = tau.hat, std.err = sqrt(sigma2.hat)))
+    }
   }
 
   #
@@ -419,5 +440,5 @@ average_treatment_effect <- function(forest,
 
   tau.avg <- tau.avg.raw + dr.correction
   tau.se <- sqrt(tau.avg.var + sigma2.hat)
-  return(c(estimate = tau.avg, std.err = tau.se))
+  return(c(estimate = unname(tau.avg), std.err = tau.se))
 }

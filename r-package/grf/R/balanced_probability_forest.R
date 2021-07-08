@@ -8,7 +8,7 @@
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
-#' @param sample.weights Weights given to an observation in prediction.
+#' @param sample.weights Weights given to an observation in estimation.
 #'                       If NULL, each observation is given the same weight. Default is NULL.
 #' @param clusters Vector of integers or factors specifying which cluster each observation corresponds to.
 #'  Default is NULL (ignored).
@@ -29,8 +29,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -77,6 +76,7 @@
 #' # Predict on out-of-bag training samples.
 #' p.hat <- predict(p.forest)
 #' }
+
 #' @import data.table
 #' @ipmort Rcpp
 #' @export
@@ -86,12 +86,12 @@ balanced_probability_forest <- function(X, Y,
                                clusters = NULL,
                                equalize.cluster.weights = FALSE,
                                sample.fraction = 0.5,
-                                target.weights = NULL,
-                              target.weight.penalty = 0,
-                              target.weight.bins.breaks = 256,
-                              target.weight.standardize = TRUE,
-                              target.weight.penalty.metric = "split_l2_norm_rate",
-                              target.avg.weights = NULL,
+                               target.weights = NULL,
+                               target.weight.penalty = 0,
+                               target.weight.bins.breaks = 256,
+                               target.weight.standardize = TRUE,
+                               target.weight.penalty.metric = "split_l2_norm_rate",
+                               target.avg.weights = NULL,
                                mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
                                min.node.size = 5,
                                honesty = TRUE,
@@ -125,13 +125,10 @@ balanced_probability_forest <- function(X, Y,
         # target.weights = as.matrix(replicate(NROW(X), 0))
         stop("If target.weight is missing, use casual_forest")
     }
-
     available_metrics = get_available_distance_metrics()
-
     if (!target.weight.penalty.metric %in% available_metrics) {
         stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
     }
-
     #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
     # then  convert to 3d array: [dim(target weight), length(list)]
     if (is.null(target.avg.weights)) {
@@ -142,10 +139,12 @@ balanced_probability_forest <- function(X, Y,
     stopifnot(is.array(target.avg.weights))
     stopifnot(dim(target.avg.weights) == c(dim(target.weights)[2], dim(X)[1], dim(X)[2]))
     # -- end of penalty
+
+
     if (length(Y) != nrow(X)) {
         stop("length of observations Y does not equal nrow(X).")
     }
-    if (any(is.na(Y))) {
+    if (anyNA(Y)) {
         stop("The vector of observations contains at least one NA.")
     }
     if (!is.factor(Y)) {
@@ -161,7 +160,7 @@ balanced_probability_forest <- function(X, Y,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
                sample.fraction = sample.fraction,
-                   target.avg.weights = target.avg.weights,
+                target.avg.weights = target.avg.weights,
               target.weight.penalty = target.weight.penalty,
               target.weight.penalty.metric = target.weight.penalty.metric,
                mtry = mtry,
@@ -268,11 +267,8 @@ predict.probability_forest <- function(object,
     } else {
         ret <- do.call.rcpp(probability_predict_oob, c(train.data, args))
     }
-    empty <- sapply(ret, function(elem) length(elem) == 0)
-    ret <- ret[!empty]
-    for (i in 1:length(ret)) {
-        colnames(ret[[i]]) <- class.names
-    }
+    colnames(ret$predictions) <- class.names
 
-    ret
+    list(predictions = ret$predictions,
+       variance.estimates = if (estimate.variance) ret$variance.estimates)
 }

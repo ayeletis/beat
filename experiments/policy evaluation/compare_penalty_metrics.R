@@ -77,7 +77,7 @@
   my_seed = 1
   my_tunable_params = c("sample.fraction","mtry","min.node.size",
                         "honesty.fraction","honesty.prune.leaves",
-                        "alpha","imbalance.penalty")
+                        "alpha","imbalance.penalty", 'target.weight.penalty')
   # THis list has the tunable params from regular GRF.
   # We could tune "target.weight.penalty" too, using [tune.parameters='all'], but chose not too because to play with it
 
@@ -126,6 +126,51 @@ X_test_demog = cbind(X_test,Z_test)
 # ================================================================
 #            Estimate TAUs
 # ----------------------------------------------------------------
+set.seed(1)
+out <- balanced_causal_forest(X_train, Y_train, W_train,
+                              target.weights = as.matrix(Z_train ) ,
+                              target.weight.penalty = 1,
+                              target.weight.standardize = TRUE,
+                              target.weight.bins.breaks = 256,
+                              honesty = TRUE,
+                              tune.parameters=my_tunable_params,
+                              num.trees = num_trees,
+                              seed=my_seed)
+print(Sys.time()-a)
+pred = predict(out)
+unlist(out$tunable.params)
+
+set.seed(1)
+out2 = regression_forest(X_train, Y_train, W_train,
+                         honesty = TRUE,
+                         tune.parameters='none',
+                         num.trees = num_trees,
+                         seed=my_seed)
+pred2 = predict(out2)
+
+
+a = Sys.time()
+out <- balanced_causal_forest(X_train, Y_train, W_train,
+                              target.weights = as.matrix(Z_train ) ,
+                              #target.weight.penalty = 1,
+                              target.weight.standardize = TRUE,
+                              target.weight.bins.breaks = 256,
+                              honesty = TRUE,
+                              #tune.parameters = my_tunable_params,
+                              num.trees = num_trees,
+                              seed=my_seed,
+                              sample.fraction = 0.5,
+                              mtry=5,
+                              min.node.size = 11,
+                              honesty.fraction = 0.6,
+                              honesty.prune.leaves =1,
+                              alpha=0.2545,
+                              imbalance.penalty=0.49072,
+                              target.weight.penalty=1.2343)
+print(Sys.time()-a)
+pred = predict(out)
+unlist(out$tunable.params)
+
 
 a = Sys.time()
 out <- balanced_causal_forest(X_train, Y_train, W_train,
@@ -140,6 +185,7 @@ out <- balanced_causal_forest(X_train, Y_train, W_train,
                               tune.parameters=my_tunable_params,
                               seed=my_seed)
 print(Sys.time()-a)
+pred = predict(out)
 # out = balanced_causal_forest(X_train, Y_train, W_train,
 #                                 target.weights = as.matrix(Z_train ) ,
 #                                 target.weight.penalty = 2,

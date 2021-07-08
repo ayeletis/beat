@@ -46,8 +46,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -73,9 +72,6 @@
 #' @param tune.num.draws The number of random parameter values considered when using the model
 #'                          to select the optimal parameters. Default is 1000.
 #' @param compute.oob.predictions Whether OOB predictions on training set should be precomputed. Default is TRUE.
-#' @param orthog.boosting (experimental) If TRUE, then when Y.hat = NULL or W.hat is NULL,
-#'                 the missing quantities are estimated using boosted regression forests.
-#'                 The number of boosting steps is selected automatically. Default is FALSE.
 #' @param num.threads Number of threads used in training. By default, the number of threads is set
 #'                    to the maximum hardware concurrency.
 #' @param seed The seed of the C++ random number generator.
@@ -159,7 +155,6 @@ causal_forest <- function(X, Y, W,
                           tune.num.reps = 50,
                           tune.num.draws = 1000,
                           compute.oob.predictions = TRUE,
-                          orthog.boosting = FALSE,
                           num.threads = NULL,
                           seed = runif(1, 0, .Machine$integer.max)) {
   has.missing.values <- validate_X(X, allow.na = TRUE)
@@ -172,30 +167,34 @@ causal_forest <- function(X, Y, W,
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty")
+  default.parameters <- list(sample.fraction = 0.5,
+                             mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                             min.node.size = 5,
+                             honesty.fraction = 0.5,
+                             honesty.prune.leaves = TRUE,
+                             alpha = 0.05,
+                             imbalance.penalty = 0)
 
   args.orthog <- list(X = X,
-                     num.trees = max(50, num.trees / 4),
-                     sample.weights = sample.weights,
-                     clusters = clusters,
-                     equalize.cluster.weights = equalize.cluster.weights,
-                     sample.fraction = sample.fraction,
-                     mtry = mtry,
-                     min.node.size = 5,
-                     honesty = TRUE,
-                     honesty.fraction = 0.5,
-                     honesty.prune.leaves = honesty.prune.leaves,
-                     alpha = alpha,
-                     imbalance.penalty = imbalance.penalty,
-                     ci.group.size = 1,
-                     tune.parameters = tune.parameters,
-                     num.threads = num.threads,
-                     seed = seed)
+                      num.trees = max(50, num.trees / 4),
+                      sample.weights = sample.weights,
+                      clusters = clusters,
+                      equalize.cluster.weights = equalize.cluster.weights,
+                      sample.fraction = sample.fraction,
+                      mtry = mtry,
+                      min.node.size = 5,
+                      honesty = TRUE,
+                      honesty.fraction = 0.5,
+                      honesty.prune.leaves = honesty.prune.leaves,
+                      alpha = alpha,
+                      imbalance.penalty = imbalance.penalty,
+                      ci.group.size = 1,
+                      tune.parameters = tune.parameters,
+                      num.threads = num.threads,
+                      seed = seed)
 
-  if (is.null(Y.hat) && !orthog.boosting) {
+  if (is.null(Y.hat)) {
     forest.Y <- do.call(regression_forest, c(Y = list(Y), args.orthog))
-    Y.hat <- predict(forest.Y)$predictions
-  } else if (is.null(Y.hat) && orthog.boosting) {
-    forest.Y <- do.call(boosted_regression_forest, c(Y = list(Y), args.orthog))
     Y.hat <- predict(forest.Y)$predictions
   } else if (length(Y.hat) == 1) {
     Y.hat <- rep(Y.hat, nrow(X))
@@ -203,11 +202,8 @@ causal_forest <- function(X, Y, W,
     stop("Y.hat has incorrect length.")
   }
 
-  if (is.null(W.hat) && !orthog.boosting) {
+  if (is.null(W.hat)) {
     forest.W <- do.call(regression_forest, c(Y = list(W), args.orthog))
-    W.hat <- predict(forest.W)$predictions
-  } else if (is.null(W.hat) && orthog.boosting) {
-    forest.W <- do.call(boosted_regression_forest, c(Y = list(W), args.orthog))
     W.hat <- predict(forest.W)$predictions
   } else if (length(W.hat) == 1) {
     W.hat <- rep(W.hat, nrow(X))
@@ -218,7 +214,7 @@ causal_forest <- function(X, Y, W,
   Y.centered <- Y - Y.hat
   W.centered <- W - W.hat
   data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered,
-                              sample.weights = sample.weights)
+                                sample.weights = sample.weights)
   args <- list(num.trees = num.trees,
                clusters = clusters,
                samples.per.cluster = samples.per.cluster,
@@ -238,28 +234,28 @@ causal_forest <- function(X, Y, W,
                reduced.form.weight = 0)
 
   tuning.output <- NULL
-  if (!identical(tune.parameters, "none")){
-    tuning.output <- tune_causal_forest(X, Y, W, Y.hat, W.hat,
-                                        sample.weights = sample.weights,
-                                        clusters = clusters,
-                                        equalize.cluster.weights = equalize.cluster.weights,
-                                        sample.fraction = sample.fraction,
-                                        mtry = mtry,
-                                        min.node.size = min.node.size,
-                                        honesty = honesty,
-                                        honesty.fraction = honesty.fraction,
-                                        honesty.prune.leaves = honesty.prune.leaves,
-                                        alpha = alpha,
-                                        imbalance.penalty = imbalance.penalty,
-                                        stabilize.splits = stabilize.splits,
-                                        ci.group.size = ci.group.size,
-                                        tune.parameters = tune.parameters,
-                                        tune.num.trees = tune.num.trees,
-                                        tune.num.reps = tune.num.reps,
-                                        tune.num.draws = tune.num.draws,
-                                        num.threads = num.threads,
-                                        seed = seed)
-    args <- modifyList(args, as.list(tuning.output[["params"]]))
+  if (!identical(tune.parameters, "none")) {
+    if (identical(tune.parameters, "all")) {
+      tune.parameters <- all.tunable.params
+    } else {
+      tune.parameters <- unique(match.arg(tune.parameters, all.tunable.params, several.ok = TRUE))
+    }
+    if (!honesty) {
+      tune.parameters <- tune.parameters[!grepl("honesty", tune.parameters)]
+    }
+    tune.parameters.defaults <- default.parameters[tune.parameters]
+    tuning.output <- tune_forest(data = data,
+                                 nrow.X = nrow(X),
+                                 ncol.X = ncol(X),
+                                 args = args,
+                                 tune.parameters = tune.parameters,
+                                 tune.parameters.defaults = tune.parameters.defaults,
+                                 tune.num.trees = tune.num.trees,
+                                 tune.num.reps = tune.num.reps,
+                                 tune.num.draws = tune.num.draws,
+                                 train = causal_train)
+
+    args <- utils::modifyList(args, as.list(tuning.output[["params"]]))
   }
 
   forest <- do.call.rcpp(causal_train, c(data, args))
@@ -369,6 +365,9 @@ predict.causal_forest <- function(object, newdata = NULL,
   train.data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
 
   if (local.linear) {
+    if (!is.null(object[["sample.weights"]])) {
+      stop("sample.weights are currently not supported for local linear forests.")
+    }
     linear.correction.variables <- validate_ll_vars(linear.correction.variables, ncol(X))
 
     if (is.null(ll.lambda)) {

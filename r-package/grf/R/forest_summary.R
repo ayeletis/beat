@@ -21,11 +21,9 @@
 #'
 #' @references Cameron, A. Colin, and Douglas L. Miller. "A practitioner's guide to
 #'  cluster-robust inference." Journal of human resources 50, no. 2 (2015): 317-372.
-#'
 #' @references Chernozhukov, Victor, Mert Demirer, Esther Duflo, and Ivan Fernandez-Val.
 #'             "Generic Machine Learning Inference on Heterogenous Treatment Effects in
 #'             Randomized Experiments." arXiv preprint arXiv:1712.04802 (2017).
-#'
 #' @references MacKinnon, James G., and Halbert White. "Some heteroskedasticity-consistent
 #'  covariance matrix estimators with improved finite sample properties."
 #'  Journal of Econometrics 29.3 (1985): 305-325.
@@ -132,14 +130,15 @@ test_calibration <- function(forest, vcov.type = "HC3") {
 #'
 #' @references Cameron, A. Colin, and Douglas L. Miller. "A practitioner's guide to
 #'  cluster-robust inference." Journal of human resources 50, no. 2 (2015): 317-372.
-#'
-#' @references Chernozhukov, Victor, and Vira Semenova. "Simultaneous inference for
-#'             Best Linear Predictor of the Conditional Average Treatment Effect and
-#'             other structural functions." arXiv preprint arXiv:1702.06240 (2017).
-#'
+#' @references Cui, Yifan, Michael R. Kosorok, Erik Sverdrup, Stefan Wager, and Ruoqing Zhu.
+#'  "Estimating Heterogeneous Treatment Effects with Right-Censored Data via Causal Survival Forests."
+#'  arXiv preprint arXiv:2001.09887, 2020.
 #' @references MacKinnon, James G., and Halbert White. "Some heteroskedasticity-consistent
 #'  covariance matrix estimators with improved finite sample properties."
 #'  Journal of Econometrics 29.3 (1985): 305-325.
+#' @references Semenova, Vira, and Victor Chernozhukov. "Debiased Machine Learning of
+#'  Conditional Average Treatment Effects and Other Causal Functions".
+#'  The Econometrics Journal (2020).
 #'
 #' @examples
 #' \donttest{
@@ -164,7 +163,7 @@ best_linear_projection <- function(forest,
   clusters <- if (length(forest$clusters) > 0) {
     forest$clusters
   } else {
-    1:length(forest$Y.orig)
+    1:NROW(forest$Y.orig)
   }
   observation.weight <- observation_weights(forest)
 
@@ -177,7 +176,7 @@ best_linear_projection <- function(forest,
   }
 
   if (!is.null(debiasing.weights)) {
-    if (length(debiasing.weights) == length(forest$Y.orig)) {
+    if (length(debiasing.weights) == NROW(forest$Y.orig)) {
       debiasing.weights <- debiasing.weights[subset]
     } else if (length(debiasing.weights) != length(subset)) {
       stop("If specified, debiasing.weights must be a vector of length n or the subset length.")
@@ -187,12 +186,12 @@ best_linear_projection <- function(forest,
   binary.W <- all(forest$W.orig %in% c(0, 1))
 
   if (binary.W) {
-    if (min(forest$W.hat[subset]) <= 0.01 && max(forest$W.hat[subset]) >= 0.99) {
+    if (min(forest$W.hat[subset]) <= 0.01 || max(forest$W.hat[subset]) >= 0.99) {
       rng <- range(forest$W.hat[subset])
       warning(paste0(
         "Estimated treatment propensities take values between ",
         round(rng[1], 3), " and ", round(rng[2], 3),
-        " and in particular get very close to 0 and 1."
+        " and in particular get very close to 0 or 1."
       ))
     }
   }
@@ -206,7 +205,7 @@ best_linear_projection <- function(forest,
 
   if (!is.null(A)) {
     A <- as.matrix(A)
-    if (nrow(A) == length(forest$Y.orig)) {
+    if (nrow(A) == NROW(forest$Y.orig)) {
       A.subset <- A[subset, , drop = FALSE]
     } else if (nrow(A) == length(subset)) {
       A.subset <- A

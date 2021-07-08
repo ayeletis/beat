@@ -163,11 +163,11 @@ variable_importance <- function(forest, decay.exponent = 2, max.depth = 4) {
   t(split.freq) %*% weight / sum(weight)
 }
 
-#' Given a trained forest and test data, compute the training sample weights for each test point.
+#' Given a trained forest and test data, compute the kernel weights for each test point.
 #'
-#' During normal prediction, these weights are computed as an intermediate step towards producing estimates.
-#' This function allows for examining the weights directly, so they could be potentially be used as the
-#' input to a different analysis.
+#' During normal prediction, these weights (named alpha in the GRF paper) are computed as an intermediate
+#' step towards producing estimates. This function allows for examining the weights directly, so they
+#' could be potentially be used as the input to a different analysis.
 #'
 #' @param forest The trained forest.
 #' @param newdata Points at which predictions should be made. If NULL,
@@ -186,30 +186,29 @@ variable_importance <- function(forest, decay.exponent = 2, max.depth = 4) {
 #' X <- matrix(2 * runif(n * p) - 1, n, p)
 #' Y <- (X[, 1] > 0) + 2 * rnorm(n)
 #' rrf <- regression_forest(X, Y, mtry = p)
-#' sample.weights.oob <- get_sample_weights(rrf)
+#' forest.weights.oob <- get_forest_weights(rrf)
 #'
 #' n.test <- 15
 #' X.test <- matrix(2 * runif(n.test * p) - 1, n.test, p)
-#' sample.weights <- get_sample_weights(rrf, X.test)
+#' forest.weights <- get_forest_weights(rrf, X.test)
 #' }
 #'
 #' @export
-get_sample_weights <- function(forest, newdata = NULL, num.threads = NULL) {
+get_forest_weights <- function(forest, newdata = NULL, num.threads = NULL) {
   num.threads <- validate_num_threads(num.threads)
 
   forest.short <- forest[-which(names(forest) == "X.orig")]
   X <- forest[["X.orig"]]
   train.data <- create_train_matrices(X)
+  args <- list(forest.object = forest.short,
+               num.threads = num.threads)
 
   if (!is.null(newdata)) {
-    data <- create_train_matrices(newdata)
+    test.data <- create_test_matrices(newdata)
     validate_newdata(newdata, X, allow.na = TRUE)
-    compute_weights(
-      forest.short, train.data$train.matrix, train.data$sparse.train.matrix,
-      data$train.matrix, data$sparse.train.matrix, num.threads
-    )
+    do.call.rcpp(compute_weights, c(train.data, test.data, args))
   } else {
-    compute_weights_oob(forest.short, train.data$train.matrix, train.data$sparse.train.matrix, num.threads)
+    do.call.rcpp(compute_weights_oob, c(train.data, args))
   }
 }
 
@@ -217,8 +216,8 @@ get_sample_weights <- function(forest, newdata = NULL, num.threads = NULL) {
 #'
 #' Given a GRF tree object, compute the leaf node a test sample falls into. The nodes in a GRF tree
 #' are numbered breadth first, and the returned numbers will be the leaf integer according
-#' to this ordering. To get sample weights based on leaf membership, see the function
-#' \code{\link{get_sample_weights}}.
+#' to this ordering. To get kernel weights based on leaf membership, see the function
+#' \code{\link{get_forest_weights}}.
 #'
 #' @param tree A GRF tree object (retrieved by `get_tree`).
 #' @param newdata Points at which leaf predictions should be made.
@@ -304,7 +303,7 @@ leaf_stats <- function(forest, samples) UseMethod("leaf_stats")
 #'
 #' @method leaf_stats default
 #' @keywords internal
-leaf_stats.default <- function(forest, samples, ...){
+leaf_stats.default <- function(forest, samples, ...) {
   return(NULL)
 }
 
@@ -317,7 +316,7 @@ leaf_stats.default <- function(forest, samples, ...){
 #'
 #' @method leaf_stats regression_forest
 #' @keywords internal
-leaf_stats.regression_forest <- function(forest, samples, ...){
+leaf_stats.regression_forest <- function(forest, samples, ...) {
   leaf_stats <- c()
   leaf_stats["avg_Y"] <- round(mean(forest$Y.orig[samples]), 2)
   return(leaf_stats)
@@ -332,7 +331,7 @@ leaf_stats.regression_forest <- function(forest, samples, ...){
 #'
 #' @method leaf_stats causal_forest
 #' @keywords internal
-leaf_stats.causal_forest <- function(forest, samples, ...){
+leaf_stats.causal_forest <- function(forest, samples, ...) {
   leaf_stats <- c()
   leaf_stats["avg_Y"] <- round(mean(forest$Y.orig[samples]), 2)
   leaf_stats["avg_W"] <- round(mean(forest$W.orig[samples]), 2)
@@ -348,7 +347,7 @@ leaf_stats.causal_forest <- function(forest, samples, ...){
 #'
 #' @method leaf_stats instrumental_forest
 #' @keywords internal
-leaf_stats.instrumental_forest <- function(forest, samples, ...){
+leaf_stats.instrumental_forest <- function(forest, samples, ...) {
 
   leaf_stats <- c()
   leaf_stats["avg_Y"] <- round(mean(forest$Y.orig[samples]), 2)

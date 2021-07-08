@@ -44,6 +44,36 @@ cd grf/r-package/grf
 Use Rstudio to open it as a project. Or double click 'grf.Rproj'
 Click Build --> Install and Restart
 ```
+
+## Update to Upstream 2.0
+The current master branch is developed on 1.2.0, and the RcppEigen is 0.3.3.7. Using the latest RcppEigen will cause error when building.
+
+The branch `upstream_2_0` is developed on 2.0.0, and the RcppEigen is upgraded to 0.3.3.9. 
+
+To build, type the following in terminal before building
+
+```
+git checkout upstream_2_0
+
+```
+
+There are some breaking changes when `sample.weights` is used in causal forest and regression forest. Please check the issue [here](https://github.com/grf-labs/grf/issues/796), [here](https://github.com/grf-labs/grf/pull/774), and the upstream [change log](https://github.com/grf-labs/grf/blob/master/releases/CHANGELOG.md#changed-breaking). The new changes take account into the size of a node when calculating sample weights, so that they have higher impact when node size is small.
+
+
+```c++
+// src/src/prediction/RegressionPredictionStrategy.cpp
+PredictionValues RegressionPredictionStrategy::precompute_prediction_values(
+{
+    ...
+    averages[OUTCOME] = sum / leaf_node.size(); // <- this cause small changes in prediction>
+    averages[WEIGHT] = weight / leaf_node.size();
+    ...
+}
+
+
+```
+
+
 ## Sample Usage
 
 Dimensions:

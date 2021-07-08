@@ -31,8 +31,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -84,11 +83,9 @@
 #' r.forest <- regression_forest(X, Y, num.trees = 100)
 #' r.pred <- predict(r.forest, X.test, estimate.variance = TRUE)
 #' }
-
 #' @ipmort Rcpp
-
-#' @export
 #' @importFrom utils modifyList
+#' @export
 balanced_regression_forest <- function(X, Y,
                               num.trees = 2000,
                               sample.weights = NULL,
@@ -149,17 +146,24 @@ balanced_regression_forest <- function(X, Y,
     # then  convert to 3d array: [dim(target weight), length(list)]
 
     ##
-
   clusters <- validate_clusters(clusters, X)
   samples.per.cluster <- validate_equalize_cluster_weights(equalize.cluster.weights, clusters, sample.weights)
   num.threads <- validate_num_threads(num.threads)
 
   all.tunable.params <- c("sample.fraction", "mtry", "min.node.size", "honesty.fraction",
                           "honesty.prune.leaves", "alpha", "imbalance.penalty",  "target.weight.penalty")
+  default.parameters <- list(sample.fraction = 0.5,
+                             mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
+                             min.node.size = 5,
+                             honesty.fraction = 0.5,
+                             honesty.prune.leaves = TRUE,
+                             alpha = 0.05,
+                             imbalance.penalty = 0,
+                             target.weight.penalty=0)
 
   data <- create_train_matrices(X, outcome = Y, sample.weights = sample.weights)
   args <- list(num.trees = num.trees,
-   target.avg.weights = target.avg.weights,
+              target.avg.weights = target.avg.weights,
               target.weight.penalty = target.weight.penalty,
               target.weight.penalty.metric = target.weight.penalty.metric,
                clusters = clusters,
@@ -178,30 +182,28 @@ balanced_regression_forest <- function(X, Y,
                seed = seed)
 
   tuning.output <- NULL
-  if (!identical(tune.parameters, "none")){
-    tuning.output <- tune_balanced_regression_forest(X, Y,
-                                            sample.weights = sample.weights,
-                                              target.avg.weights = target.avg.weights,
-                                            target.weight.penalty = target.weight.penalty,
-                                            target.weight.penalty.metric = target.weight.penalty.metric,
-                                            clusters = clusters,
-                                            equalize.cluster.weights = equalize.cluster.weights,
-                                            sample.fraction = sample.fraction,
-                                            mtry = mtry,
-                                            min.node.size = min.node.size,
-                                            honesty = honesty,
-                                            honesty.fraction = honesty.fraction,
-                                            honesty.prune.leaves = honesty.prune.leaves,
-                                            alpha = alpha,
-                                            imbalance.penalty = imbalance.penalty,
-                                            ci.group.size = ci.group.size,
-                                            tune.parameters = tune.parameters,
-                                            tune.num.trees = tune.num.trees,
-                                            tune.num.reps = tune.num.reps,
-                                            tune.num.draws = tune.num.draws,
-                                            num.threads = num.threads,
-                                            seed = seed)
-    args <- modifyList(args, as.list(tuning.output[["params"]]))
+  if (!identical(tune.parameters, "none")) {
+    if (identical(tune.parameters, "all")) {
+      tune.parameters <- all.tunable.params
+    } else {
+      tune.parameters <- unique(match.arg(tune.parameters, all.tunable.params, several.ok = TRUE))
+    }
+    if (!honesty) {
+      tune.parameters <- tune.parameters[!grepl("honesty", tune.parameters)]
+    }
+    tune.parameters.defaults <- default.parameters[tune.parameters]
+    tuning.output <- tune_forest(data = data,
+                                 nrow.X = nrow(X),
+                                 ncol.X = ncol(X),
+                                 args = args,
+                                 tune.parameters = tune.parameters,
+                                 tune.parameters.defaults = tune.parameters.defaults,
+                                 tune.num.trees = tune.num.trees,
+                                 tune.num.reps = tune.num.reps,
+                                 tune.num.draws = tune.num.draws,
+                                 train = balanced_regression_train)
+
+    args <- utils::modifyList(args, as.list(tuning.output[["params"]]))
   }
 
   forest <- do.call.rcpp(balanced_regression_train, c(data, args))
@@ -215,8 +217,7 @@ balanced_regression_forest <- function(X, Y,
   forest[["tunable.params"]] <- args[all.tunable.params]
   forest[["tuning.output"]] <- tuning.output
   forest[["has.missing.values"]] <- has.missing.values
-      forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
-
+  forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
 
   forest
 }
@@ -236,7 +237,7 @@ balanced_regression_forest <- function(X, Y,
 #'                   we run a locally weighted linear regression on the included variables.
 #'                   Please note that this is a beta feature still in development, and may slow down
 #'                   prediction considerably. Defaults to NULL.
-#' @param ll.lambda Ridge penalty for local linear predictions
+#' @param ll.lambda Ridge penalty for local linear predictions. Defaults to NULL and will be cross-validated.
 #' @param ll.weight.penalty Option to standardize ridge penalty by covariance (TRUE),
 #'                            or penalize all covariates equally (FALSE). Defaults to FALSE.
 #' @param num.threads Number of threads used in training. If set to NULL, the software
@@ -304,6 +305,9 @@ predict.regression_forest <- function(object, newdata = NULL,
   train.data <- create_train_matrices(X, outcome = object[["Y.orig"]])
 
   if (local.linear) {
+    if (!is.null(object[["sample.weights"]])) {
+      stop("sample.weights are currently not supported for local linear forests.")
+    }
     linear.correction.variables <- validate_ll_vars(linear.correction.variables, ncol(X))
 
     if (is.null(ll.lambda)) {

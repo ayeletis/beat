@@ -4,7 +4,7 @@
 #' the conditional mean functions mu_i(x) = E[Y_i | X = x]
 #'
 #' @param X The covariates used in the regression.
-#' @param Y The outcomes.
+#' @param Y The outcomes (must be a numeric vector/matrix with no NAs).
 #' @param num.trees Number of trees grown in the forest. Note: Getting accurate
 #'                  confidence intervals generally requires more trees than
 #'                  getting accurate predictions. Default is 2000.
@@ -31,8 +31,7 @@
 #'                      Default is 5.
 #' @param honesty Whether to use honest splitting (i.e., sub-sample splitting). Default is TRUE.
 #'  For a detailed description of honesty, honesty.fraction, honesty.prune.leaves, and recommendations for
-#'  parameter tuning, see the grf
-#'  \href{https://grf-labs.github.io/grf/REFERENCE.html#honesty-honesty-fraction-honesty-prune-leaves}{algorithm reference}.
+#'  parameter tuning, see the grf algorithm reference.
 #' @param honesty.fraction The fraction of data that will be used for determining splits if honesty = TRUE. Corresponds
 #'                         to set J1 in the notation of the paper. Default is 0.5 (i.e. half of the data is used for
 #'                         determining splits).
@@ -160,8 +159,14 @@ predict.multi_regression_forest <- function(object,
                                             newdata = NULL,
                                             num.threads = NULL,
                                             ...) {
+  outcome.names <- if (is.null(colnames(object[["Y.orig"]]))) {
+    paste0("Y", 1:NCOL(object[["Y.orig"]]))
+  } else {
+    colnames(object[["Y.orig"]])
+  }
   # If possible, use pre-computed predictions.
   if (is.null(newdata) && !is.null(object$predictions)) {
+    colnames(object$predictions) <- outcome.names
     return(list(predictions = object$predictions))
   }
 
@@ -181,6 +186,7 @@ predict.multi_regression_forest <- function(object,
   } else {
     ret <- do.call.rcpp(multi_regression_predict_oob, c(train.data, args))
   }
+  colnames(ret$predictions) <- outcome.names
 
   list(predictions = ret$predictions)
 }

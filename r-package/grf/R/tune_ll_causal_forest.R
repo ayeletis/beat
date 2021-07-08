@@ -1,6 +1,6 @@
 #' Local linear forest tuning
 #'
-#' Finds the optimal ridge penalty for local linear prediction.
+#' Finds the optimal ridge penalty for local linear causal prediction.
 #'
 #' @param forest The forest used for prediction.
 #' @param linear.correction.variables Variables to use for local linear prediction. If left null,
@@ -12,31 +12,21 @@
 #' @param lambda.path Optional list of lambdas to use for cross-validation.
 #' @return A list of lambdas tried, corresponding errors, and optimal ridge penalty lambda.
 #'
-#' @examples
-#' \donttest{
-#' # Find the optimal tuning parameters.
-#' n <- 500
-#' p <- 10
-#' X <- matrix(rnorm(n * p), n, p)
-#' Y <- X[, 1] * rnorm(n)
-#' forest <- regression_forest(X, Y)
-#' tuned.lambda <- tune_ll_regression_forest(forest)
-#'
-#' # Use this parameter to predict from a local linear forest.
-#' predictions <- predict(forest, linear.correction.variables = 1:p,
-#'                        ll.lambda = tuned.lambda$lambda.min)
-#' }
-#'
-#' @export
-tune_ll_regression_forest <- function(forest,
-                                      linear.correction.variables = NULL,
-                                      ll.weight.penalty = FALSE,
-                                      num.threads = NULL,
-                                      lambda.path = NULL) {
+#' @keywords internal
+tune_ll_causal_forest <- function(forest,
+                                  linear.correction.variables = NULL,
+                                  ll.weight.penalty = FALSE,
+                                  num.threads = NULL,
+                                  lambda.path = NULL) {
   forest.short <- forest[-which(names(forest) == "X.orig")]
   X <- forest[["X.orig"]]
   Y <- forest[["Y.orig"]]
-  train.data <- create_train_matrices(X, outcome = Y)
+  W <- forest[["W.orig"]]
+  Y.hat <- forest[["Y.hat"]]
+  W.hat <- forest[["W.hat"]]
+  Y.centered <- Y - Y.hat
+  W.centered <- W - W.hat
+  train.data <- create_train_matrices(X, outcome = Y.centered, treatment = W.centered)
 
   # Validate variables
   num.threads <- validate_num_threads(num.threads)
@@ -53,10 +43,12 @@ tune_ll_regression_forest <- function(forest,
                ll.weight.penalty = ll.weight.penalty,
                linear.correction.variables = linear.correction.variables)
 
-  prediction.object <- do.call.rcpp(ll_regression_predict_oob, c(train.data, args))
+  # Find sequence of predictions by lambda
+  prediction.object <- do.call.rcpp(ll_causal_predict_oob, c(train.data, args))
   predictions <- prediction.object$predictions
   errors <- apply(predictions, MARGIN = 2, FUN = function(row) {
-    mean((row - Y)**2)
+    # compute R-learner loss
+    mean(((Y - Y.hat) - (W - W.hat) * row)**2)
   })
 
   return(list(
