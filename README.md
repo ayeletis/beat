@@ -2,6 +2,8 @@
 
 Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
+(update to 2.0.0 is available. please switch to the branch `upstream_2_0_0` if you want to build it. There are no major changes in function `balanced_causal_forest` if parameter `sample.weights` is not used.)
+
 ## Build From Source:
 
 Required R packages
