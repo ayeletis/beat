@@ -1,4 +1,5 @@
 *.DS_Store
+grf.Rproj
 .Rproj.user
 test/*
 *.Rproj.user
