@@ -1,0 +1,46 @@
+Package: beat
+Title: Generalized Random Forests
+Version: 1.2.4
+Authors@R: c(
+    person("Julie", "Tibshirani", role = c("aut", "cre"), email = "jtibs@cs.stanford.edu"),
+    person("Susan", "Athey", role = "aut"),
+    person("Rina", "Friedberg", role = "ctb"),
+    person("Vitor", "Hadad", role = "ctb"),
+    person("David", "Hirshberg", role = "ctb"),
+    person("Luke", "Miner", role = "ctb"),
+    person("Erik", "Sverdrup", role = "ctb"),
+    person("Stefan", "Wager", role = "aut"),
+    person("Marvin", "Wright", role = "ctb")
+    )
+BugReports: https://github.com/beat-labs/beat/issues
+Description: A pluggable package for forest-based statistical estimation and inference.
+    BEAT currently provides methods for non-parametric least-squares regression,
+    quantile regression, survival regression and treatment effect estimation (optionally using instrumental
+    variables), with support for missing values.
+Depends:
+    R (>= 3.5.0)
+License: GPL-3
+LinkingTo: RcppArmadillo, RcppEigen, Rcpp
+Imports:
+    data.table,
+    RcppArmadillo,
+    DiceKriging,
+    lmtest,
+    Matrix,
+    methods,
+    Rcpp (>= 0.12.15),
+    sandwich (>= 2.4-0),
+    RcppEigen(>= 0.3.3.7),
+    doParallel,
+    foreach, 
+    iterators,
+    testthat, 
+    arrangements,
+    ROI
+RoxygenNote: 7.1.1
+Suggests:
+    DiagrammeR,
+    testthat,
+    MASS
+SystemRequirements: GNU make
+URL: https://github.com/beat-labs/beat
