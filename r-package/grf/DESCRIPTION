@@ -22,15 +22,22 @@ Depends:
 License: GPL-3
 LinkingTo: RcppArmadillo, RcppEigen, Rcpp
 Imports:
-	data.table,
-	RcppArmadillo,
+	  data.table,
+	  RcppArmadillo,
     DiceKriging,
     lmtest,
     Matrix,
     methods,
     Rcpp (>= 0.12.15),
     sandwich (>= 2.4-0),
-	RcppEigen(>= 0.3.3.7)
+	  RcppEigen(>= 0.3.3.7),
+	  doParallel,
+    foreach, 
+    iterators,
+    testthat, 
+    arrangements,
+    ROI
+	  
 RoxygenNote: 7.1.1
 Suggests:
     DiagrammeR,
