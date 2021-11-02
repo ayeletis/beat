@@ -36,7 +36,8 @@ Imports:
     iterators,
     testthat, 
     arrangements,
-    ROI
+    ROI,
+    stringi
 RoxygenNote: 7.1.1
 Suggests:
     DiagrammeR,

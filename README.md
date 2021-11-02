@@ -1,141 +1,117 @@
 # generalized random forests <a href='https://grf-labs.github.io/grf/'><img src='https://raw.githubusercontent.com/grf-labs/grf/master/images/logo/grf_logo_wbg_cropped.png' align="right" height="120" /></a>
 
-Fork from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
+Forked from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
-(update to 2.0.0 is available. please switch to the branch `upstream_2_0_0` if you want to build it. There are no major changes in function `balanced_causal_forest` if parameter `sample.weights` is not used.)
+## Installation
 
-## Build From Source:
+This package is not available on CRAN and must be built from source. On Windows you will
+need RTools from https://cran.r-project.org/bin/windows/Rtools/ and on OS X you will 
+need the developer tools documented in https://mac.r-project.org/tools/.
 
-Required R packages
+First install the `devtools` package, then use it to install `beat`:
+
 ```R
-extra_pkgs = c(
-  "data.table", 'Rcpp', 'Rcpp', 'RcppArmadillo', 'doParallel',
-  'foreach', 'iterators',  'testthat', 'arrangements', 'ROI'
-)
-
-for (i in extra_pkgs) {
-  install.packages(i)
-}
-
-# this is much faster than installing from source
-install.packages('stringi', type = 'binary') 
-
+install.packages(c("devtools", "ggplot2")) ## ggplot2 only needed for example
+devtools::install_github("ayeletis/grf", subdir="r-package/beat")
 ```
 
-
-
-Update Local Repo ( in the Repo root folder)
-
-This method may speed up build time as not all files are recompiled. 
-```
-git fetch --all 
-```
-or Double click grf/r-package/grf/grf.Rproj --> Tools --> Version Control--> Pull Branches. 
-You may need to correct some file conflicts.  
-
-You may start new repo in a folder
-
-
-Click Build --> Install and Restart
-
-
-Clean Build and all files are compiled. 
-```
-git clone https://github.com/yu45020/grf
-cd grf/r-package/grf
-Use Rstudio to open it as a project. Or double click 'grf.Rproj'
-Click Build --> Install and Restart
-```
 ## Sample Usage
 
-Dimensions:
-
-X_train: [N, N_x]
-
-Y_train: [N, 1]
-
-Z_train: [N, N_z]
-
-
-[Possible Distance Metrics](https://github.com/yu45020/grf/blob/master/r-package/grf/src/src/splitting/SplittingPenaltyMetric.cpp):
-
-
-* `split_l2_norm_rate`: (default) left, right: l2 norm(colmean target weight)* penalty rate * node decrease
-* `euclidean_distance_rate`: (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
-* `cosine_similarity_rate`: (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
-* `split_l2_norm`: sum(left,right l2 norm(colmean target weight))* penalty rate
-* `euclidean_distance`: Euclidean distance (column mean target weight left, right ) * penalty rate
-* `cosine_similarity`: (1-cos_sim(column mean target weight left, right )) * penalty rate
-
-
-
 ```R
-available_metrics = c("split_l2_norm_rate", "euclidean_distance_rate","cosine_similarity_rate", 
-                      "split_l2_norm",  "euclidean_distance",  "cosine_similarity")
+library(beat)
+library(ggplot2)
 
+rm(list=ls())
+
+
+## ----------------------------------------------
+##   Simulate some data
+## ----------------------------------------------
+
+n1 = 1000; #calibration 
+n2 = 1000; #validation
+p_continuous = 4  # number of continuous features (unprotected)
+p_discrete = 3  # number of discrete features (unprotected)
+p_demog = 1 # number of protected attributes
+n = n1 + n2
+
+                                        # Features (unprotected)
+X_cont = matrix(rnorm(n*p_continuous), n, p_continuous)
+X_disc = matrix(rbinom(n*p_discrete, 1, 0.3),n,p_discrete)
+X = cbind(X_cont,X_disc)
+
+                                        # Protected attributes, discrete and continuous, where the first one is correlated with X[,2]
+Z = rbinom(n, 1, 1/(1+exp(-X_cont[,2])))
+
+                                        # Tau -- in this example in depends on X[2] but no on Z
+tau <- (-1 + pmax(X[,1], 0) + X[,2] + abs(X[,3]) + X[,5]) 
+
+                                        # Random assignment
+W = rbinom(n, 1, 0.5)
+
+                                        # Output for causal forest
+Y =  X[,1] - 2*X[,2] + X[,4] + 3*Z + tau*W + runif(n)   # Y is function of X, Z(demo), tau*W
+
+train_data = data.frame(Y=Y[c(1:n1)], Z=Z[c(1:n1)], W=W[c(1:n1)], X=X[c(1:n1),], tau = tau[c(1:n1)])
+test_data = data.frame(Y=Y[c((n1+1):(n1+n2))], Z=Z[c((n1+1):(n1+n2))], W=W[c((n1+1):(n1+n2))], X=X[c((n1+1):(n1+n2)),], tau = tau[c((n1+1):(n1+n2))])
+
+Xcols = grep("X", names(train_data), value=TRUE)
+Zcols =grep('Z', names(train_data), value=TRUE)
+
+
+## train
+X_train = train_data[,c(4:10)]
+Y_train = train_data$Y
+W_train = train_data$W
+Z_train = train_data[,2]
+
+## test
+X_test = test_data[,c(4:10)]
+Z_test = test_data$Z
+
+## model specs
+num_trees = 2000
+my_penalty = 10 # When penalty = 0 it corresponds to GRF
+
+## ----------------------------------------------
+##   Estimate Balanced Causal Forest 
+## ----------------------------------------------
+fit_causal_beat <- balanced_causal_forest(X_train, Y_train, W_train,
+                                          target.weights = as.matrix(Z_train),
+                                          target.weight.penalty = my_penalty,
+                                          num.trees = num_trees)
+
+
+## Predict CBT causal scores
+cbt_causal_train = predict(fit_causal_beat)$predictions
+cbt_causal_test = predict(fit_causal_beat, X_test)$predictions
+
+
+## ----------------------------------------------
+##   Estimate Balanced Probability Forest 
+## ----------------------------------------------
+fit_regression_beat <- balanced_regression_forest(X_train, Y_train,
+                                                  target.weights = as.matrix(Z_train),
+                                                  target.weight.penalty = my_penalty,
+                                                  num.trees = num_trees)
+
+## Predict CBT regression scores
+cbt_regression_train = predict(fit_regression_beat)$predictions
+cbt_regression_test = predict(fit_regression_beat, X_test)$predictions
+
+
+## ----------------------------------------------
+##   Check balance in test scores
+## ----------------------------------------------
+dat.plot = data.frame(cbt_causal = cbt_causal_test,
+                      cbt_regr = cbt_regression_test,
+                      Z = as.factor(Z_test))
+ggplot(data=dat.plot,
+       aes(x=cbt_regr, color=Z, fill=Z)) +
+    geom_density(alpha = 0.2)
 
 ```
 
-```R
-# default setup
-balanced_causal_forest <- function(X,
-                          Y,
-                          W,
-                          Y.hat = NULL,
-                          W.hat = NULL,
-                          num.trees = 2000,
-                          sample.weights = NULL,
-                          target.weights = NULL,
-                          target.weight.penalty = 0,
-                          target.weight.bins.breaks = 256,
-                          target.weight.standardize = TRUE,
-                          target.weight.penalty.metric = "split_l2_norm_rate",
-                          target.avg.weights = NULL, # array, if null, create internally
-                          clusters = NULL,
-                          equalize.cluster.weights = FALSE,
-                          sample.fraction = 0.5,
-                          mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
-                          min.node.size = 5,
-                          honesty = TRUE,
-                          honesty.fraction = 0.5,
-                          honesty.prune.leaves = TRUE,
-                          alpha = 0.05,
-                          imbalance.penalty = 0,
-                          stabilize.splits = TRUE,
-                          ci.group.size = 2,
-                          tune.parameters = "none",
-                          tune.num.trees = 200,
-                          tune.num.reps = 50,
-                          tune.num.draws = 1000,
-                          compute.oob.predictions = TRUE,
-                          orthog.boosting = FALSE,
-                          num.threads = NULL,
-                          seed = runif(1, 0, .Machine$integer.max)) {
-
-    # :----  procedure ---:
-    # 1. check input data
-    # 2. get list of target weights: per column of X, bin X and get column-wise average of target weight
-    # 3. (default): small forest to get Y_hat and W_hat, then Y-Y_hat, W - W_hat
-    # 4. tune parameters via the same balanced_calsal_forest function
-    #    a.tunnalbe parameters are in tune_balanced_causal_forest,
-    #    b. prepare data and pass into tune_balanced_forest
-    #       * random sample parameters from some distributions
-    #       * fit small forest and get debiased.error
-    #       * fit dice kriging: debiased.error ~ parameter values and find the smallest combinations (not necessary the tried version)
-    #       * re-fit balanced_causal_forest by the best set and larger tress
-    #       * return the best or default parameter set
-    # 5. fit actual balanced_calsal_forest
-    # +++++++++++++++++++++
-    # to make penalty tunable, change tune_balance_causal_forest.R and tunning_balanced.R
-
-    # target.avg.weights: array, [num target weight, observation, num x]
-    # if null, create it internally
-}    
-```
-
-## Comparison on Distance Metrics
-Previous versions use split l2 norm rate for left and right splits. Cosine similarity is problematic when penalty rate is larger than 1.5 as all points are pushed to a node. 
-![benchmark metrics imbalance ate](./images/benchmark_metrics_penalty_rate_test_data.png)
 
 ATE V.S. Imbalance Z1
 ![benchmark metrics imbalance ate](./images/benchmark_metrics_imbalance_ate.png)
