@@ -221,7 +221,6 @@ src/commons/Data.h
 [Sample usage](r-package/grf/tests/causual_forest_test.R)
 
 ### Results:
-<img src="images/density_difference.png" width="800">
 <img src="images/result_with_z_correlation.png" width="800">
 
 If Z is independent from X 
