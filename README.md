@@ -1,4 +1,4 @@
-# BEAT - Bias-Eliminating Adapted Trees  
+# BEAT (Bias-Eliminating Adapted Trees)
 Forked from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
 ## Installation
