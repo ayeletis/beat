@@ -1,6 +1,0 @@
-library(testthat)
-library(beat)
-
-# This treats warnings as errors
-options(warn = 2)
-test_check("grf")
