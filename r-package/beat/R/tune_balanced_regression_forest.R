@@ -153,8 +153,7 @@ tune_balanced_regression_forest <- function(X, Y,
                num.threads = num.threads,
                seed = seed,
                target.avg.weights=target.avg.weights,
-               target.weight.penalty=target.weight.penalty,
-               target.weight.penalty.metric="split_l2_norm_rate")
+               target.weight.penalty=target.weight.penalty)
 
 
 

@@ -167,8 +167,7 @@ tune_balanced_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                seed = seed,
                reduced.form.weight = 0,
                target.avg.weights=target.avg.weights,
-               target.weight.penalty=target.weight.penalty,
-               target.weight.penalty.metric="split_l2_norm_rate")
+               target.weight.penalty=target.weight.penalty)
 
   if (identical(tune.parameters, "all")) {
     tune.parameters <- all.tunable.params
