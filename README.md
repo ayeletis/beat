@@ -104,9 +104,14 @@ cbt_regression_test = predict(fit_regression_beat, X_test)$predictions
 dat.plot = data.frame(cbt_causal = cbt_causal_test,
                       cbt_regr = cbt_regression_test,
                       Z = as.factor(Z_test))
-ggplot(data=dat.plot,
-       aes(x=cbt_regr, color=Z, fill=Z)) +
-    geom_density(alpha = 0.2)
+
+ggdensity(data=dat.plot,
+          x='cbt_causal', color='Z', fill='Z', alpha=0.2, add = "mean")
+
+
+ggdensity(data=dat.plot,
+          x='cbt_regr', color='Z', fill='Z', alpha=0.2, add = "mean")
+
 
 ```
 
