@@ -220,7 +220,7 @@ src/commons/Data.h
 
 --
 
-[Sample usage](r-package/grf/tests/causual_forest_test.R)
+[Sample usage](vignettes/dummy_code_beat_causal.R)
 
 ### Results:
 <img src="images/result_with_z_correlation.png" width="800">
