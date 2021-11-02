@@ -1,31 +1,27 @@
+# OS X files
 *.DS_Store
-grf.Rproj
-.Rproj.user
-test/*
-*.Rproj.user
-*.history
-*.gz
-releases/*
-*.idea
 *.dll
 *.Rd
 *.rd
-*.Rd
-*.png
-r-package/grf/.vs/slnx.sqlite
-r-package/grf/.vs/VSWorkspaceState.json
-r-package/grf/.vs/grf/v15/.suo
-r-package/grf/src/.vscode/settings.json
-*.rds
+# emacs files
+*~
+
+# R session files
+.Rproj.user
+.Rhistory
 *.RData
-*.fst
-*.zip
-*.html
-*.csv
-**/trash/*
-*.Rmd
-*.txt
-*.pdf
-*.json
-.*
-!/.gitignore
+*.Rout
+inst/doc
+docs/
+
+# compiled object files
+*.so
+*.slo
+*.lo
+*.o
+*.obj
+# package artifacts
+*.tar.gz
+
+# clion files
+.idea/
