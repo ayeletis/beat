@@ -145,9 +145,6 @@ balanced_regression_forest <- function(X, Y,
                         "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
                         )
-    if (!target.weight.penalty.metric %in% available_metrics) {
-        stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
-    }
 
     if(is.null(target.avg.weights)){
       target.avg.weights = construct_target_weight_mean(x = X, z = target.weights,

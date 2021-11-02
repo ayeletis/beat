@@ -226,9 +226,6 @@ balanced_causal_forest <- function(X,
                         "euclidean_distance", #  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
                         )
-    if (!target.weight.penalty.metric %in% available_metrics) {
-        stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
-    }
 
       #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
     # then  convert to 3d array: [dim(target weight), length(list)]

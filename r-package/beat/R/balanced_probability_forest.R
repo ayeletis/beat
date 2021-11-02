@@ -130,10 +130,6 @@ balanced_probability_forest <- function(X, Y,
 
     available_metrics = get_available_distance_metrics()
 
-    if (!target.weight.penalty.metric %in% available_metrics) {
-        stop(sprintf("Available penalty metrics are: %s", paste(available_metrics, collapse = ', ')))
-    }
-
     #output list : [dim(X)[2]] [[num target weight feature, num rows obs]]
     # then  convert to 3d array: [dim(target weight), length(list)]
     if (is.null(target.avg.weights)) {
