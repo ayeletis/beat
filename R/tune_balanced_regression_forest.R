@@ -100,7 +100,8 @@ tune_balanced_regression_forest <- function(X, Y,
                                   num.threads = NULL,
                                   seed = runif(1, 0, .Machine$integer.max),
                                   target.avg.weights=NULL,
-                                  target.weight.penalty=0) {
+                                  target.weight.penalty=0,
+                                  target.weight.penalty.metric="split_l2_norm_rate") {
   validate_X(X, allow.na = TRUE)
   validate_sample_weights(sample.weights, X)
   Y <- validate_observations(Y, X)
@@ -153,7 +154,8 @@ tune_balanced_regression_forest <- function(X, Y,
                num.threads = num.threads,
                seed = seed,
                target.avg.weights=target.avg.weights,
-               target.weight.penalty=target.weight.penalty)
+               target.weight.penalty=target.weight.penalty,
+               target.weight.penalty.metric=target.weight.penalty.metric)
 
 
 
