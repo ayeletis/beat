@@ -1,5 +1,4 @@
-# generalized random forests <a href='https://grf-labs.github.io/grf/'><img src='https://raw.githubusercontent.com/grf-labs/grf/master/images/logo/grf_logo_wbg_cropped.png' align="right" height="120" /></a>
-
+# BEAT - Bias-Eliminating Adapted Trees  
 Forked from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
 ## Installation
