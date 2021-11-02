@@ -152,7 +152,6 @@ balanced_causal_forest <- function(X,
                           target.weight.penalty = 0,
                           target.weight.bins.breaks = 256,
                           target.weight.standardize = TRUE,
-                          target.weight.penalty.metric = "split_l2_norm_rate",
                           target.avg.weights = NULL,
                           clusters = NULL,
                           equalize.cluster.weights = FALSE,
@@ -332,7 +331,7 @@ balanced_causal_forest <- function(X,
     # nested list of matrix, one matrix per column of X
     target.avg.weights = target.avg.weights,
     target.weight.penalty = target.weight.penalty,
-    target.weight.penalty.metric = target.weight.penalty.metric,
+    target.weight.penalty.metric = "split_l2_norm_rate",
     clusters = clusters,
     samples.per.cluster = samples.per.cluster,
     sample.fraction = sample.fraction,
@@ -363,7 +362,7 @@ balanced_causal_forest <- function(X,
       sample.weights = sample.weights,
       target.avg.weights = target.avg.weights,
       target.weight.penalty = target.weight.penalty,
-      target.weight.penalty.metric = target.weight.penalty.metric,
+      target.weight.penalty.metric = "split_l2_norm_rate",
       clusters = clusters,
       equalize.cluster.weights = equalize.cluster.weights,
       sample.fraction = sample.fraction,
@@ -403,7 +402,7 @@ balanced_causal_forest <- function(X,
     forest[["tunable.params"]] <- args[all.tunable.params]
     forest[["tuning.output"]] <- tuning.output
     forest[["has.missing.values"]] <- has.missing.values
-    forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
+    forest[["target.weight.penalty.metric"]] <- "split_l2_norm_rate"
 
     forest
 }

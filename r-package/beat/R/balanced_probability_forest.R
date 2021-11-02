@@ -92,7 +92,6 @@ balanced_probability_forest <- function(X, Y,
                               target.weight.penalty = 0,
                               target.weight.bins.breaks = 256,
                               target.weight.standardize = TRUE,
-                              target.weight.penalty.metric = "split_l2_norm_rate",
                               target.avg.weights = NULL,
                                mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
                                min.node.size = 5,
@@ -168,7 +167,7 @@ balanced_probability_forest <- function(X, Y,
                sample.fraction = sample.fraction,
               target.avg.weights = target.avg.weights,
               target.weight.penalty = target.weight.penalty,
-              target.weight.penalty.metric = target.weight.penalty.metric,
+              target.weight.penalty.metric = "split_l2_norm_rate",
                mtry = mtry,
                min.node.size = min.node.size,
                honesty = honesty,
@@ -192,7 +191,7 @@ balanced_probability_forest <- function(X, Y,
     forest[["has.missing.values"]] <- has.missing.values
     forest[["num.classes"]] <- num.classes
     forest[["class.names"]] <- class.names
-    forest[["target.weight.penalty.metric"]] <- target.weight.penalty.metric
+    forest[["target.weight.penalty.metric"]] <- "split_l2_norm_rate"
 
     forest
 }
