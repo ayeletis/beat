@@ -113,10 +113,6 @@ ggplot(data=dat.plot,
 
 ```
 
-
-ATE V.S. Imbalance Z1
-![benchmark metrics imbalance ate](./images/benchmark_metrics_imbalance_ate.png)
-
 ## Targeting Policy
 I write some functions for balanced sampling and greedy sampling. The script is [here](https://github.com/yu45020/grf/blob/master/r-package/grf/R/select_targets.R). 
 
