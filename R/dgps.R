@@ -52,7 +52,7 @@
 #' }
 #' @importFrom stats toeplitz
 #' @importFrom utils installed.packages
-#' @export
+#'
 generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise = 1,
                                  dgp = c("simple", "aw1", "aw2", "aw3", "aw3reverse",
                                          "ai1", "ai2", "kunzel", "nw1", "nw2", "nw3", "nw4")) {
@@ -239,7 +239,7 @@ generate_causal_data <- function(n, p, sigma.m = 1, sigma.tau = 0.1, sigma.noise
 #' }
 #'
 #' @importFrom stats dbeta rbinom rexp rnorm rpois
-#' @export
+#'
 generate_survival_data <- function(n, p, Y.max = NULL, X = NULL, n.mc = 10000,
                                    dgp = c("simple1", "type1", "type2", "type3", "type4", "type5")) {
   .minp <- c(simple1 = 1, type1 = 5, type2 = 5, type3 = 5, type4 = 5, type5 = 5)

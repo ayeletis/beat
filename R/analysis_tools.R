@@ -32,7 +32,7 @@
 #' q.tree$nodes
 #' }
 #'
-#' @export
+#'
 get_tree <- function(forest, index) {
   if (index < 1 || index > forest[["_num_trees"]]) {
     stop(paste("The provided index,", index, "is not valid."))
@@ -125,7 +125,7 @@ get_tree <- function(forest, index) {
 #' split_frequencies(q.forest)
 #' }
 #'
-#' @export
+#'
 split_frequencies <- function(forest, max.depth = 4) {
   raw <- compute_split_frequencies(forest, max.depth)
   feature.indices <- 1:ncol(forest$X.orig)
@@ -155,7 +155,7 @@ split_frequencies <- function(forest, max.depth = 4) {
 #' variable_importance(q.forest)
 #' }
 #'
-#' @export
+#'
 variable_importance <- function(forest, decay.exponent = 2, max.depth = 4) {
   split.freq <- split_frequencies(forest, max.depth)
   split.freq <- split.freq / pmax(1L, rowSums(split.freq))
@@ -193,7 +193,7 @@ variable_importance <- function(forest, decay.exponent = 2, max.depth = 4) {
 #' sample.weights <- get_sample_weights(rrf, X.test)
 #' }
 #'
-#' @export
+#'
 get_sample_weights <- function(forest, newdata = NULL, num.threads = NULL) {
   num.threads <- validate_num_threads(num.threads)
 
@@ -243,7 +243,7 @@ get_sample_weights <- function(forest, newdata = NULL, num.threads = NULL) {
 #' get_leaf_node(tree, X.test, node.id = FALSE)
 #' }
 #'
-#' @export
+#'
 get_leaf_node <- function(tree, newdata, node.id = TRUE) {
   if (!("grf_tree" %in% class(tree))) {
     stop("get_leaf_node is only implemented for class `grf_tree`")

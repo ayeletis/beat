@@ -79,7 +79,7 @@
 #' }
 
 #' @import data.table
-#' @ipmort Rcpp
+#' @import Rcpp
 #'
 #' @export
 balanced_probability_forest <- function(X, Y,
@@ -177,7 +177,7 @@ balanced_probability_forest <- function(X, Y,
                seed = seed)
 
     forest <- do.call.rcpp(balanced_probability_train, c(data, args))
-    class(forest) <- c("probability_forest", "grf")
+    class(forest) <- c("balanced_probability_forest", "probability_forest", "grf")
     forest[["X.orig"]] <- X
     forest[["Y.orig"]] <- Y
     forest[["Y.relabeled"]] <- Y.relabeled
@@ -237,9 +237,9 @@ balanced_probability_forest <- function(X, Y,
 #' p.hat <- predict(p.forest)
 #' }
 #'
-#' @method predict probability_forest
+#' @method predict balanced_probability_forest
 #' @export
-predict.probability_forest <- function(object,
+predict.balanced_probability_forest <- function(object,
                                        newdata = NULL,
                                        num.threads = NULL,
                                        estimate.variance = FALSE, ...) {

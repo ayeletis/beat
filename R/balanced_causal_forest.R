@@ -138,7 +138,7 @@
 #'
 
 #' @import data.table
-#' @ipmort Rcpp
+#' @import Rcpp
 #'
 #' @export
 balanced_causal_forest <- function(X,
@@ -385,7 +385,7 @@ balanced_causal_forest <- function(X,
     forest <- do.call.rcpp(balanced_causal_train, c(data, args))
 
     # prepare output
-    class(forest) <- c("causal_forest", "grf")
+    class(forest) <- c("balanced_causal_forest", "causal_forest", "grf")
     forest[["ci.group.size"]] <- ci.group.size
     forest[["X.orig"]] <- X
     forest[["Y.orig"]] <- Y

@@ -79,7 +79,7 @@
 #' forest <- ll_regression_forest(X, Y)
 #' }
 #'
-#' @export
+#'
 ll_regression_forest <- function(X, Y,
                                 enable.ll.split = FALSE,
                                 ll.split.weight.penalty = FALSE,
@@ -249,7 +249,7 @@ ll_regression_forest <- function(X, Y,
 #' }
 #'
 #' @method predict ll_regression_forest
-#' @export
+#'
 predict.ll_regression_forest <- function(object, newdata = NULL,
                                          linear.correction.variables = NULL,
                                          ll.lambda = NULL,

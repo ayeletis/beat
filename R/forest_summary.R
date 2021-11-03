@@ -41,7 +41,7 @@
 #' test_calibration(forest)
 #' }
 #'
-#' @export
+#'
 test_calibration <- function(forest, vcov.type = "HC3") {
   observation.weight <- observation_weights(forest)
   clusters <- if (length(forest$clusters) > 0) {
@@ -154,7 +154,7 @@ test_calibration <- function(forest, vcov.type = "HC3") {
 #'
 #' @return An estimate of the best linear projection, along with coefficient standard errors.
 #'
-#' @export
+#'
 best_linear_projection <- function(forest,
                                    A = NULL,
                                    subset = NULL,

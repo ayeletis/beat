@@ -136,7 +136,7 @@
 #' tau.hat <- predict(tau.forest)$predictions
 #' }
 #'
-#' @export
+#'
 causal_forest <- function(X, Y, W,
                           Y.hat = NULL,
                           W.hat = NULL,
@@ -343,7 +343,7 @@ causal_forest <- function(X, Y, W,
 #' }
 #'
 #' @method predict causal_forest
-#' @export
+#'
 predict.causal_forest <- function(object, newdata = NULL,
                                   linear.correction.variables = NULL,
                                   ll.lambda = NULL,

@@ -3,7 +3,7 @@
 #' @param forest A grf forest object
 #' @param ... Additional arguments
 #' @return A vector of scores
-#' @export
+#'
 get_scores <- function(forest, ...) {
   UseMethod("get_scores")
 }
@@ -41,7 +41,7 @@ get_scores <- function(forest, ...) {
 #'             American Statistical Association 90(429), 1995.
 #'
 #' @method get_scores causal_forest
-#' @export
+#'
 get_scores.causal_forest <- function(forest,
                                      subset = NULL,
                                      debiasing.weights = NULL,
@@ -129,7 +129,7 @@ get_scores.causal_forest <- function(forest,
 #'             American Statistical Association 90(429), 1995.
 #'
 #' @method get_scores balanced_causal_forest
-#' @export
+#'
 get_scores.balanced_causal_forest <- function(forest,
                                      subset = NULL,
                                      debiasing.weights = NULL,
@@ -223,7 +223,7 @@ get_scores.balanced_causal_forest <- function(forest,
 #'             Local Average Treatment Effects." Econometrica 62(2), 1994.
 #'
 #' @method get_scores instrumental_forest
-#' @export
+#'
 get_scores.instrumental_forest <- function(forest,
                                            subset = NULL,
                                            debiasing.weights = NULL,
@@ -307,7 +307,7 @@ get_scores.instrumental_forest <- function(forest,
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @method get_scores causal_survival_forest
-#' @export
+#'
 get_scores.causal_survival_forest <- function(forest,
                                               subset = NULL,
                                               ...) {

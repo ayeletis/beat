@@ -68,7 +68,7 @@
 #' mr.pred <- predict(mr.forest)
 #' }
 #'
-#' @export
+#'
 multi_regression_forest <- function(X, Y,
                                     num.trees = 2000,
                                     sample.weights = NULL,
@@ -155,7 +155,7 @@ multi_regression_forest <- function(X, Y,
 #' }
 #'
 #' @method predict multi_regression_forest
-#' @export
+#'
 predict.multi_regression_forest <- function(object,
                                             newdata = NULL,
                                             num.threads = NULL,

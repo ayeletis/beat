@@ -85,7 +85,7 @@
 #' r.pred <- predict(r.forest, X.test, estimate.variance = TRUE)
 #' }
 #'
-#' @export
+#'
 #' @importFrom utils modifyList
 regression_forest <- function(X, Y,
                               num.trees = 2000,
@@ -232,7 +232,7 @@ regression_forest <- function(X, Y,
 #' }
 #'
 #' @method predict regression_forest
-#' @export
+#'
 predict.regression_forest <- function(object, newdata = NULL,
                                       linear.correction.variables = NULL,
                                       ll.lambda = NULL,

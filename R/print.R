@@ -5,7 +5,7 @@
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @method print grf
-#' @export
+#'
 print.grf <- function(x, decay.exponent = 2, max.depth = 4, ...) {
   var.importance <- variable_importance(x, decay.exponent, max.depth)
   var.importance <- c(round(var.importance, 3))
@@ -27,7 +27,7 @@ print.grf <- function(x, decay.exponent = 2, max.depth = 4, ...) {
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @method print grf_tree
-#' @export
+#'
 print.grf_tree <- function(x, ...) {
   cat("GRF tree object", "\n")
   cat("Number of training samples:", x$num_samples, "\n")
@@ -80,7 +80,7 @@ print.grf_tree <- function(x, ...) {
 #' @param ... Additional arguments (currently ignored).
 #'
 #' @method print boosted_regression_forest
-#' @export
+#'
 print.boosted_regression_forest <- function(x, ...) {
   cat("Boosted GRF object", "\n")
   cat("Number of forests: ", length(x$forests), "\n")
@@ -96,7 +96,7 @@ print.boosted_regression_forest <- function(x, ...) {
 #'
 #' @method print tuning_output
 #' @importFrom stats aggregate quantile
-#' @export
+#'
 print.tuning_output <- function(x, tuning.quantiles = seq(0, 1, 0.2), ...) {
   if (x$status == "failure") {
     cat("Tuning status: failure.\n")

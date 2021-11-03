@@ -78,7 +78,7 @@
 #' p.hat <- predict(p.forest)
 #' }
 #'
-#' @export
+#'
 probability_forest <- function(X, Y,
                                num.trees = 2000,
                                sample.weights = NULL,
@@ -193,7 +193,8 @@ probability_forest <- function(X, Y,
 #' }
 #'
 #' @method predict probability_forest
-#' @export
+#'
+#'
 predict.probability_forest <- function(object,
                                        newdata = NULL,
                                        num.threads = NULL,

@@ -43,7 +43,7 @@
 #' @return An estimate of the average (C)LATE, along with standard error.
 #'
 #' @importFrom stats coef lm predict var weighted.mean
-#' @export
+#'
 average_late <- function(forest,
                          compliance.score = NULL,
                          subset = NULL) {

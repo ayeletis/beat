@@ -85,7 +85,7 @@
 #' Z.hat <- predict(regression_forest(X, Z, num.trees = 500))$predictions
 #' tuned.iv.forest <- instrumental_forest(X, Y, T, Z, Y.hat, W.hat, Z.hat, tune.parameters = "all")
 #'}
-#' @export
+#'
 tune_instrumental_forest <- function(X, Y, W, Z, Y.hat, W.hat, Z.hat,
                                     sample.weights = NULL,
                                     clusters = NULL,

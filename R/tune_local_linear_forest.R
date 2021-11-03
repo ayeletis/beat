@@ -27,7 +27,7 @@
 #'                        ll.lambda = tuned.lambda$lambda.min)
 #' }
 #'
-#' @export
+#'
 tune_ll_regression_forest <- function(forest,
                                       linear.correction.variables = NULL,
                                       ll.weight.penalty = FALSE,

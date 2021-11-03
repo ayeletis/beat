@@ -27,7 +27,7 @@
 #' big_rf <- merge_forests(list(r.forest1, r.forest2))
 #' }
 #'
-#' @export
+#'
 merge_forests <- function(forest_list, compute.oob.predictions = TRUE) {
   validate_forest_list(forest_list)
   first_forest <- forest_list[[1]]

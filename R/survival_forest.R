@@ -103,7 +103,7 @@
 #'           type = "l", lty = 2)
 #' }
 #'
-#' @export
+#'
 survival_forest <- function(X, Y, D,
                             failure.times = NULL,
                             num.trees = 1000,
@@ -249,7 +249,7 @@ survival_forest <- function(X, Y, D,
 #' }
 #'
 #' @method predict survival_forest
-#' @export
+#'
 predict.survival_forest <- function(object,
                                     newdata = NULL,
                                     failure.times = NULL,
