@@ -169,7 +169,7 @@
 #' points(X.test[, 1], predict(cs.forest.grid, X.test)$predictions, col = "blue")
 #' }
 #'
-#' @export
+#'
 causal_survival_forest <- function(X, Y, W, D,
                                    W.hat = NULL,
                                    E1.hat = NULL,
@@ -452,7 +452,7 @@ causal_survival_forest <- function(X, Y, W, D,
 #' }
 #'
 #' @method predict causal_survival_forest
-#' @export
+#'
 predict.causal_survival_forest <- function(object,
                                            newdata = NULL,
                                            num.threads = NULL,

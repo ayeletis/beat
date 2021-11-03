@@ -88,7 +88,7 @@
 #' print(length(boosted.forest$forests))
 #' }
 #'
-#' @export
+#'
 boosted_regression_forest <- function(X, Y,
                                       num.trees = 2000,
                                       sample.weights = NULL,
@@ -237,7 +237,7 @@ boosted_regression_forest <- function(X, Y,
 #' }
 #'
 #' @method predict boosted_regression_forest
-#' @export
+#'
 predict.boosted_regression_forest <- function(object, newdata = NULL,
                                               boost.predict.steps = NULL,
                                               num.threads = NULL,

@@ -129,7 +129,7 @@ export_graphviz <- function(tree, include.na.path) {
 #' tree.plot = plot(tree)
 #' cat(DiagrammeRsvg::export_svg(tree.plot), file = 'plot.svg')
 #' }
-#' @export
+#'
 plot.grf_tree <- function(x, include.na.path = NULL, ...) {
   if (!requireNamespace("DiagrammeR", quietly = TRUE)) {
     stop("Package \"DiagrammeR\" must be installed to plot trees.")

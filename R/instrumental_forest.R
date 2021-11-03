@@ -97,7 +97,7 @@
 #' iv.pred <- predict(iv.forest)
 #' }
 #'
-#' @export
+#'
 instrumental_forest <- function(X, Y, W, Z,
                                 Y.hat = NULL,
                                 W.hat = NULL,
@@ -287,7 +287,7 @@ instrumental_forest <- function(X, Y, W, Z,
 #' }
 #'
 #' @method predict instrumental_forest
-#' @export
+#'
 predict.instrumental_forest <- function(object, newdata = NULL,
                                         num.threads = NULL,
                                         estimate.variance = FALSE,

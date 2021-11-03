@@ -87,7 +87,7 @@
 #' )
 #' }
 #'
-#' @export
+#'
 tune_causal_forest <- function(X, Y, W, Y.hat, W.hat,
                               sample.weights = NULL,
                               clusters = NULL,

@@ -60,7 +60,7 @@
 #' c.pred <- predict(c.forest, X.test)
 #' }
 #'
-#' @export
+#'
 custom_forest <- function(X, Y,
                           sample.fraction = 0.5,
                           mtry = min(ceiling(sqrt(ncol(X)) + 20), ncol(X)),
@@ -130,7 +130,7 @@ custom_forest <- function(X, Y,
 #' }
 #'
 #' @method predict custom_forest
-#' @export
+#'
 predict.custom_forest <- function(object, newdata = NULL, num.threads = NULL, ...) {
   forest.short <- object[-which(names(object) == "X.orig")]
 

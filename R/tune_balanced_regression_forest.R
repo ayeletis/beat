@@ -79,7 +79,7 @@
 #' )
 #' }
 #'
-#' @export
+#'
 tune_balanced_regression_forest <- function(X, Y,
                                   sample.weights = NULL,
                                   clusters = NULL,

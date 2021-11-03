@@ -321,7 +321,7 @@ standardize = function(x) {
     }
 }
 
-#' @export
+#'
 construct_target_weight_mean = function(x, z, num_breaks = 256) {
     calculate_avg = function(dat, x_col, z_col, num_breaks) {
         df = dat[, .SD, .SDcols = c(x_col, z_col)]
@@ -355,7 +355,7 @@ construct_target_weight_mean = function(x, z, num_breaks = 256) {
     return(target.avg.weights)
 }
 
-#' @export
+#'
 available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean target weight)* penalty rate * node decrease
                         "euclidean_distance_rate", # (left+right decrease) *  Euclidean distance (column mean target weight left, right ) * penalty rate
                         "cosine_similarity_rate", # (left+right decrease) *  (1-cos_sim(column mean target weight left, right )) * penalty rate
@@ -365,7 +365,7 @@ available_metrics = c("split_l2_norm_rate", # left, right: l2 norm(colmean targe
                         "cosine_similarity" #  (1-cos_sim(column mean target weight left, right )) * penalty rate
                         )
 
-#' @export
+#'
 get_available_distance_metrics = function() {
     return(available_metrics)
 }

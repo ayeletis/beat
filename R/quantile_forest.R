@@ -78,7 +78,7 @@
 #' q.hat <- predict(meins.forest, X.test, quantiles = c(0.1, 0.5, 0.9))
 #' }
 #'
-#' @export
+#'
 quantile_forest <- function(X, Y,
                             num.trees = 2000,
                             quantiles = c(0.1, 0.5, 0.9),
@@ -175,7 +175,7 @@ quantile_forest <- function(X, Y,
 #' }
 #'
 #' @method predict quantile_forest
-#' @export
+#'
 predict.quantile_forest <- function(object,
                                     newdata = NULL,
                                     quantiles = NULL,
