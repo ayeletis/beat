@@ -86,7 +86,7 @@
 #' }
 #'
 #'
-#' @ipmort Rcpp
+#' @import Rcpp
 #'
 #' @export
 #' @importFrom utils modifyList
@@ -218,7 +218,7 @@ balanced_regression_forest <- function(X, Y,
     }
 
     forest <- do.call.rcpp(balanced_regression_train, c(data, args))
-    class(forest) <- c("regression_forest", "grf")
+    class(forest) <- c("balanced_regression_forest", "regression_forest", "grf")
     forest[["ci.group.size"]] <- ci.group.size
     forest[["X.orig"]] <- X
     forest[["Y.orig"]] <- Y
@@ -290,9 +290,9 @@ balanced_regression_forest <- function(X, Y,
 #' r.pred <- predict(r.forest, X.test, estimate.variance = TRUE)
 #' }
 #'
-#' @method predict regression_forest
+#' @method predict balanced_regression_forest
 #' @export
-predict.regression_forest <- function(object, newdata = NULL,
+predict.balanced_regression_forest <- function(object, newdata = NULL,
                                       linear.correction.variables = NULL,
                                       ll.lambda = NULL,
                                       ll.weight.penalty = FALSE,
