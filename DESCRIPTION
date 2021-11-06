@@ -2,7 +2,7 @@ Package: beat
 Title: Bias-Eliminating Adapted Trees
 Version: 1.2.4
 Authors@R: c(
-    person("Eva", "Ascarza", role = "aut"),
+    person("Eva", "Ascarza", role = c("aut","cre"), email="eascarza@hbs.edu"),
     person("Ayelet", "Israeli", role = "aut")
     )
 Description: A pluggable package for replicating the analysis in the XXXXXXX paper <link>.
