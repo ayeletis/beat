@@ -86,7 +86,7 @@ cbt_causal_test = predict(fit_causal_beat, X_test)$predictions
 
 
 ## ----------------------------------------------
-##   Estimate Balanced Probability Forest 
+##   Estimate Balanced Regression Forest 
 ## ----------------------------------------------
 fit_regression_beat <- balanced_regression_forest(X_train, Y_train,
                                                   target.weights = as.matrix(Z_train),
