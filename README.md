@@ -14,6 +14,14 @@ install.packages(c("devtools", "ggplot2")) ## ggplot2 only needed for example
 devtools::install_version("RcppEigen", "0.3.3.7.0") ## beat does not work with newer RcppEigen
 devtools::install_github("ayeletis/beat")  ## do not update any packages if prompted
 ```
+## Changes relative to GRF
+The package offers three new functions: balanced_causal_forest, balanced_regression_forest, 
+balanced_probability_forest. 
+
+All arguments are the same as the original package, but there are two new inputs: 
+target.weight.penalty indicates the penalty assigned to the protected attributes.
+target.weights is a matrix that includes the protected characteristics. X should not 
+inlcude the protected characteristics.
 
 ## Sample Usage
 
