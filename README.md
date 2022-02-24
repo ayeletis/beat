@@ -1,4 +1,6 @@
 # BEAT (Bias-Eliminating Adapted Trees)
+Eva Ascarza and Ayelet Israeli
+
 Forked from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
 ## Installation
