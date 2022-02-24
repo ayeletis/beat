@@ -23,7 +23,7 @@ target.weight.penalty indicates the penalty assigned to the protected attributes
 target.weights is a matrix that includes the protected characteristics. X should not 
 inlcude the protected characteristics.
 
-See full details about the BEAT method in: XXX link.
+See full details about the BEAT method in the original paper.
 
 ## Sample Usage
 
