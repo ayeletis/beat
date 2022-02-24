@@ -1,5 +1,5 @@
 # BEAT (Bias-Eliminating Adapted Trees)
-[Eva Ascarza](http://www.evaascarza.com/) and [Ayelet Israeli](http://www.hbs.edu/~aisraeli)
+[Eva Ascarza](http://www.evaascarza.com/) and [Ayelet Israeli](http://www.hbs.edu/aisraeli)
 
 Forked from [https://github.com/grf-labs/grf](https://github.com/grf-labs/grf)
 
