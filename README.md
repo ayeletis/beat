@@ -25,7 +25,7 @@ target.weight.penalty indicates the penalty assigned to the protected attributes
 target.weights is a matrix that includes the protected characteristics. X should not 
 inlcude the protected characteristics.
 
-See full details about the BEAT method in the original paper.
+See full details about the BEAT method in the original paper: [Eliminating unintended bias in personalized policies using bias-eliminating adapted trees (BEAT)](https://www.pnas.org/doi/10.1073/pnas.2115293119) 
 
 ## Sample Usage
 
