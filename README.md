@@ -14,7 +14,7 @@ First install the `devtools` package, then use it to install `beat`:
 ```R
 install.packages(c("devtools", "ggplot2")) ## ggplot2 only needed for example
 devtools::install_version("RcppEigen", "0.3.3.7.0") ## beat does not work with newer RcppEigen
-devtools::install_version("RcppArmadillo", "0.10.7.5.0") ## beat does not work with newer RcppArmadillo
+devtools::install_version("RcppArmadillo", "0.11.4.0.1") ## beat does not work with newer RcppArmadillo
 devtools::install_github("ayeletis/beat")  ## do not update the RcppEigen or RcppArmadillo package if prompted
 ```
 ## Changes relative to GRF
