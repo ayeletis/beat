@@ -9,6 +9,8 @@ This package is not available on CRAN and must be built from source. On Windows 
 need RTools from https://cran.r-project.org/bin/windows/Rtools/ and on OS X you will 
 need the developer tools documented in https://mac.r-project.org/tools/.
 
+Please, note, this package only runs on R-4.2.3 or earlier. Please follow the instructions below.
+
 First install the `devtools` package, then use it to install `beat`:
 
 ```R
